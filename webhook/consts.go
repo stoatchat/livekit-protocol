@@ -32,6 +32,8 @@ const (
 	EventParticipantConnectionAborted = "participant_connection_aborted"
 	EventTrackPublished               = "track_published"
 	EventTrackUnpublished             = "track_unpublished"
+	EventTrackMuted                   = "track_muted"
+	EventTrackUnmuted                 = "track_unmuted"
 	EventEgressStarted                = "egress_started"
 	EventEgressUpdated                = "egress_updated"
 	EventEgressEnded                  = "egress_ended"

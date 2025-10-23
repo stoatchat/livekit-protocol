@@ -1,4 +1,4 @@
-module github.com/livekit/protocol
+module github.com/stoatchat/livekit-protocol
 
 go 1.23.0
 
