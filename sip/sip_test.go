@@ -17,15 +17,20 @@ package sip
 import (
 	"fmt"
 	"net/netip"
+	"regexp"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/dennwc/iters"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/durationpb"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/livekit/protocol/livekit"
 	"github.com/livekit/protocol/rpc"
+	"github.com/livekit/protocol/utils/prototest"
 )
 
 func TestNormalizeNumber(t *testing.T) {
@@ -286,6 +291,32 @@ func TestSIPMatchTrunk(t *testing.T) {
 	}
 }
 
+// TestSIPMatchTrunkSameTrunkDuplicateNumberForms verifies that a trunk listing
+// the same number in both +E.164 and bare forms is not treated as a conflict
+// with itself. Regression test for "Multiple SIP Trunks matched" when a user
+// configures both "+19793169351" and "19793169351" on one trunk.
+func TestSIPMatchTrunkSameTrunkDuplicateNumberForms(t *testing.T) {
+	trunks := []*livekit.SIPInboundTrunkInfo{
+		{SipTrunkId: "aaa", Numbers: []string{"+" + sipNumber2, sipNumber2}},
+	}
+	for _, toNum := range []string{sipNumber2, "+" + sipNumber2} {
+		t.Run("to="+toNum, func(t *testing.T) {
+			call := &rpc.SIPCall{
+				SipCallId: "test-call-id",
+				SourceIp:  "1.1.1.1",
+				From:      &livekit.SIPUri{User: sipNumber1, Host: "sip.example.com"},
+				To:        &livekit.SIPUri{User: toNum},
+			}
+			call.Address = call.To
+			got, err := MatchTrunkIter(iters.Slice(trunks), call, WithTrunkConflict(func(t1, t2 *livekit.SIPInboundTrunkInfo, reason TrunkConflictReason) {
+				t.Fatalf("unexpected conflict: %v\n%v\nvs\n%v", reason, t1, t2)
+			}))
+			require.NoError(t, err)
+			require.Equal(t, trunks[0], got)
+		})
+	}
+}
+
 func TestSIPValidateTrunks(t *testing.T) {
 	for _, c := range trunkCases {
 		c := c
@@ -303,6 +334,39 @@ func TestSIPValidateTrunks(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestSIPValidateTrunksNormalizedNumbers verifies conflict detection treats different
+// forms of the same number as equivalent. A single trunk listing the same number in
+// multiple forms must not be flagged against itself; two different trunks listing the
+// same number in different forms must be flagged as conflicting.
+func TestSIPValidateTrunksNormalizedNumbers(t *testing.T) {
+	t.Run("same trunk duplicate Numbers forms", func(t *testing.T) {
+		trunks := []*livekit.SIPInboundTrunkInfo{
+			{SipTrunkId: "aaa", Numbers: []string{"+" + sipNumber2, sipNumber2}},
+		}
+		require.NoError(t, ValidateTrunks(trunks))
+	})
+	t.Run("same trunk duplicate AllowedNumbers forms", func(t *testing.T) {
+		trunks := []*livekit.SIPInboundTrunkInfo{
+			{SipTrunkId: "aaa", Numbers: []string{sipNumber2}, AllowedNumbers: []string{"+" + sipNumber1, sipNumber1}},
+		}
+		require.NoError(t, ValidateTrunks(trunks))
+	})
+	t.Run("different trunks different Numbers forms", func(t *testing.T) {
+		trunks := []*livekit.SIPInboundTrunkInfo{
+			{SipTrunkId: "aaa", Numbers: []string{"+" + sipNumber2}},
+			{SipTrunkId: "bbb", Numbers: []string{sipNumber2}},
+		}
+		require.Error(t, ValidateTrunks(trunks))
+	})
+	t.Run("different trunks different AllowedNumbers forms", func(t *testing.T) {
+		trunks := []*livekit.SIPInboundTrunkInfo{
+			{SipTrunkId: "aaa", Numbers: []string{sipNumber2}, AllowedNumbers: []string{"+" + sipNumber1}},
+			{SipTrunkId: "bbb", Numbers: []string{sipNumber2}, AllowedNumbers: []string{sipNumber1}},
+		}
+		require.Error(t, ValidateTrunks(trunks))
+	})
 }
 
 func newSIPTrunkDispatch() *livekit.SIPTrunkInfo {
@@ -331,11 +395,11 @@ func newDirectDispatch(room, pin string) *livekit.SIPDispatchRule {
 	}
 }
 
-func newIndividualDispatch(roomPref, pin string) *livekit.SIPDispatchRule {
+func newIndividualDispatch(roomPref, pin string, randomize bool) *livekit.SIPDispatchRule {
 	return &livekit.SIPDispatchRule{
 		Rule: &livekit.SIPDispatchRule_DispatchRuleIndividual{
 			DispatchRuleIndividual: &livekit.SIPDispatchRuleIndividual{
-				RoomPrefix: roomPref, Pin: pin,
+				RoomPrefix: roomPref, Pin: pin, NoRandomness: !randomize,
 			},
 		},
 	}
@@ -496,9 +560,9 @@ var dispatchCases = []struct {
 		expErr:  true,
 		invalid: true,
 	},
-	// Rules for specific numbers take priority.
+	// Rules for specific inbound numbers take priority.
 	{
-		name:  "direct/number specific",
+		name:  "direct/inbound number specific",
 		trunk: newSIPTrunkDispatch(),
 		rules: []*livekit.SIPDispatchRuleInfo{
 			{TrunkIds: nil, Rule: newDirectDispatch("sip1", "")},
@@ -507,7 +571,7 @@ var dispatchCases = []struct {
 		exp: 1,
 	},
 	{
-		name:  "direct/number specific pin",
+		name:  "direct/inbound number specific pin",
 		trunk: newSIPTrunkDispatch(),
 		rules: []*livekit.SIPDispatchRuleInfo{
 			{TrunkIds: nil, Rule: newDirectDispatch("sip1", "123")},
@@ -516,7 +580,7 @@ var dispatchCases = []struct {
 		exp: 1,
 	},
 	{
-		name:  "direct/number specific conflict",
+		name:  "direct/inbound number specific conflict",
 		trunk: newSIPTrunkDispatch(),
 		rules: []*livekit.SIPDispatchRuleInfo{
 			{TrunkIds: nil, Rule: newDirectDispatch("sip1", ""), InboundNumbers: []string{sipNumber1}},
@@ -525,7 +589,7 @@ var dispatchCases = []struct {
 		expErr:  true,
 		invalid: true,
 	},
-	// Check the "personal room" use case. Rule that accepts a number without a pin and requires pin for everyone else.
+	// Check the "personal room" use case. Rule that accepts an inbound number without a pin and requires pin for everyone else.
 	{
 		name:  "direct/open specific vs pin generic",
 		trunk: newSIPTrunkDispatch(),
@@ -540,7 +604,7 @@ var dispatchCases = []struct {
 		name:  "direct vs individual/private",
 		trunk: newSIPTrunkDispatch(),
 		rules: []*livekit.SIPDispatchRuleInfo{
-			{TrunkIds: nil, Rule: newIndividualDispatch("pref_", "123")},
+			{TrunkIds: nil, Rule: newIndividualDispatch("pref_", "123", true)},
 			{TrunkIds: nil, Rule: newDirectDispatch("sip", "123")},
 		},
 		expErr:  true,
@@ -550,7 +614,7 @@ var dispatchCases = []struct {
 		name:  "direct vs individual/open",
 		trunk: newSIPTrunkDispatch(),
 		rules: []*livekit.SIPDispatchRuleInfo{
-			{TrunkIds: nil, Rule: newIndividualDispatch("pref_", "")},
+			{TrunkIds: nil, Rule: newIndividualDispatch("pref_", "", true)},
 			{TrunkIds: nil, Rule: newDirectDispatch("sip", "")},
 		},
 		expErr:  true,
@@ -561,11 +625,69 @@ var dispatchCases = []struct {
 		name:  "direct vs individual/priority",
 		trunk: newSIPTrunkDispatch(),
 		rules: []*livekit.SIPDispatchRuleInfo{
-			{TrunkIds: nil, Rule: newIndividualDispatch("pref_", "123")},
+			{TrunkIds: nil, Rule: newIndividualDispatch("pref_", "123", true)},
 			{TrunkIds: nil, Rule: newDirectDispatch("sip", "456")},
 		},
 		reqPin: "456",
 		exp:    1,
+	},
+	// Rules for specific numbers take priority.
+	{
+		name:  "direct/number specific",
+		trunk: newSIPTrunkDispatch(),
+		rules: []*livekit.SIPDispatchRuleInfo{
+			{TrunkIds: nil, Rule: newDirectDispatch("sip_1", "")},
+			{TrunkIds: nil, Rule: newDirectDispatch("sip_2", ""), Numbers: []string{sipNumber2}},
+		},
+		exp: 1,
+	},
+	{
+		name:  "direct/number specific pin",
+		trunk: newSIPTrunkDispatch(),
+		rules: []*livekit.SIPDispatchRuleInfo{
+			{TrunkIds: nil, Rule: newDirectDispatch("sip_1", "123")},
+			{TrunkIds: nil, Rule: newDirectDispatch("sip_2", "123"), Numbers: []string{sipNumber2}},
+		},
+		exp: 1,
+	},
+	{
+		name:  "direct/number specific conflict",
+		trunk: newSIPTrunkDispatch(),
+		rules: []*livekit.SIPDispatchRuleInfo{
+			{TrunkIds: nil, Rule: newDirectDispatch("sip_1", ""), Numbers: []string{sipNumber1}},
+			{TrunkIds: nil, Rule: newDirectDispatch("sip_2", ""), Numbers: []string{sipNumber1, sipNumber2}},
+		},
+		expErr:  true,
+		invalid: true,
+	},
+	{
+		name:  "direct/number + inbound number specific conflict",
+		trunk: newSIPTrunkDispatch(),
+		rules: []*livekit.SIPDispatchRuleInfo{
+			{TrunkIds: nil, Rule: newDirectDispatch("sip_1", ""), Numbers: []string{sipNumber1}, InboundNumbers: []string{sipNumber1}},
+			{TrunkIds: nil, Rule: newDirectDispatch("sip_2", ""), Numbers: []string{sipNumber1, sipNumber2}, InboundNumbers: []string{sipNumber1}},
+		},
+		expErr:  true,
+		invalid: true,
+	},
+	// Check the "personal room" use case. Rule that accepts a number without a pin and requires pin for everyone else.
+	{
+		name:  "direct/open specific vs pin generic",
+		trunk: newSIPTrunkDispatch(),
+		rules: []*livekit.SIPDispatchRuleInfo{
+			{TrunkIds: nil, Rule: newDirectDispatch("sip_1", "123")},
+			{TrunkIds: nil, Rule: newDirectDispatch("sip_2", ""), Numbers: []string{sipNumber2}},
+		},
+		exp: 1,
+	},
+	{
+		name:  "direct/open specific vs pin generic",
+		trunk: newSIPTrunkDispatch(),
+		rules: []*livekit.SIPDispatchRuleInfo{
+			{TrunkIds: nil, Rule: newDirectDispatch("sip_1", "123")},
+			{TrunkIds: nil, Rule: newDirectDispatch("sip_2", ""), Numbers: []string{sipNumber2}, InboundNumbers: []string{sipNumber1}},
+		},
+		exp: 1,
 	},
 }
 
@@ -633,15 +755,374 @@ func TestSIPValidateDispatchRules(t *testing.T) {
 }
 
 func TestEvaluateDispatchRule(t *testing.T) {
+	const projectID = "p_123"
+	const caller = "+15551234567"
+	const callee = "+3333"
+	const prefix = "testPrefix"
+	var quotedCaller = regexp.QuoteMeta(caller)
+
+	req := &rpc.EvaluateSIPDispatchRulesRequest{
+		SipCallId:     "call-id",
+		CallingNumber: caller,
+		CallingHost:   "sip.example.com",
+		CalledNumber:  callee,
+	}
+	tr := &livekit.SIPInboundTrunkInfo{SipTrunkId: "trunk"}
+
+	t.Run("Direct", func(t *testing.T) {
+		d := &livekit.SIPDispatchRuleInfo{
+			SipDispatchRuleId: "rule",
+			Rule:              newDirectDispatch("room", ""),
+			HidePhoneNumber:   false,
+			InboundNumbers:    nil,
+			Numbers:           nil,
+			Name:              "",
+			Metadata:          "rule-meta",
+			Attributes: map[string]string{
+				"rule-attr": "1",
+			},
+			MediaEncryption: livekit.SIPMediaEncryption_SIP_MEDIA_ENCRYPT_REQUIRE,
+		}
+		r := &rpc.EvaluateSIPDispatchRulesRequest{
+			SipCallId:     "call-id",
+			CallingNumber: "+11112222",
+			CallingHost:   "sip.example.com",
+			CalledNumber:  "+3333",
+			ExtraAttributes: map[string]string{
+				"prov-attr": "1",
+			},
+		}
+		tr := &livekit.SIPInboundTrunkInfo{SipTrunkId: "trunk"}
+		res, err := EvaluateDispatchRule("p_123", tr, d, r)
+		require.NoError(t, err)
+		exp := &rpc.EvaluateSIPDispatchRulesResponse{
+			ProjectId:           "p_123",
+			Result:              rpc.SIPDispatchResult_ACCEPT,
+			SipTrunkId:          "trunk",
+			SipDispatchRuleId:   "rule",
+			RoomName:            "room",
+			ParticipantIdentity: "sip_+11112222",
+			ParticipantName:     "Phone +11112222",
+			ParticipantMetadata: "rule-meta",
+			ParticipantAttributes: map[string]string{
+				"rule-attr":                   "1",
+				"prov-attr":                   "1",
+				livekit.AttrSIPCallID:         "call-id",
+				livekit.AttrSIPTrunkID:        "trunk",
+				livekit.AttrSIPDispatchRuleID: "rule",
+				livekit.AttrSIPPhoneNumber:    "+11112222",
+				livekit.AttrSIPTrunkNumber:    "+3333",
+				livekit.AttrSIPHostName:       "sip.example.com",
+			},
+			MediaEncryption: livekit.SIPMediaEncryption_SIP_MEDIA_ENCRYPT_REQUIRE,
+			Media: &livekit.SIPMediaConfig{
+				Encryption: new(livekit.SIPMediaEncryption_SIP_MEDIA_ENCRYPT_REQUIRE),
+			},
+		}
+		require.True(t, proto.Equal(exp, res), "%v\nvs\n%v", exp, res)
+
+		d.HidePhoneNumber = true
+		d.MediaEncryption = 0
+		d.Media = &livekit.SIPMediaConfig{
+			Encryption: new(livekit.SIPMediaEncryption_SIP_MEDIA_ENCRYPT_ALLOW),
+		}
+		res, err = EvaluateDispatchRule("p_123", tr, d, r)
+		require.NoError(t, err)
+		exp = &rpc.EvaluateSIPDispatchRulesResponse{
+			ProjectId:           "p_123",
+			Result:              rpc.SIPDispatchResult_ACCEPT,
+			SipTrunkId:          "trunk",
+			SipDispatchRuleId:   "rule",
+			RoomName:            "room",
+			ParticipantIdentity: "sip_c15a31c71649a522",
+			ParticipantName:     "Phone 2222",
+			ParticipantMetadata: "rule-meta",
+			ParticipantAttributes: map[string]string{
+				"rule-attr":                   "1",
+				"prov-attr":                   "1",
+				livekit.AttrSIPCallID:         "call-id",
+				livekit.AttrSIPTrunkID:        "trunk",
+				livekit.AttrSIPDispatchRuleID: "rule",
+			},
+			MediaEncryption: livekit.SIPMediaEncryption_SIP_MEDIA_ENCRYPT_ALLOW,
+			Media: &livekit.SIPMediaConfig{
+				Encryption: new(livekit.SIPMediaEncryption_SIP_MEDIA_ENCRYPT_ALLOW),
+			},
+		}
+		require.True(t, proto.Equal(exp, res), "%v\nvs\n%v", exp, res)
+	})
+	t.Run("Individual", func(t *testing.T) {
+		t.Run("minimal", func(t *testing.T) {
+			testDR := livekit.SIPDispatchRuleInfo{
+				SipDispatchRuleId: "rule",
+				Rule:              newIndividualDispatch("", "", false),
+			}
+			res, err := EvaluateDispatchRule(projectID, tr, &testDR, req)
+			require.NoError(t, err)
+			require.Equal(t, rpc.SIPDispatchResult_ACCEPT, res.Result)
+			require.Equal(t, caller, res.RoomName, "room name should be from")
+		})
+		t.Run("only prefix", func(t *testing.T) {
+			testDR := livekit.SIPDispatchRuleInfo{
+				SipDispatchRuleId: "rule",
+				Rule:              newIndividualDispatch(prefix, "", false),
+			}
+			res, err := EvaluateDispatchRule(projectID, tr, &testDR, req)
+			require.NoError(t, err)
+			require.Equal(t, rpc.SIPDispatchResult_ACCEPT, res.Result)
+			require.Equal(t, prefix+"_"+caller, res.RoomName)
+		})
+		t.Run("only randomize", func(t *testing.T) {
+			testDR := livekit.SIPDispatchRuleInfo{
+				SipDispatchRuleId: "rule",
+				Rule:              newIndividualDispatch("", "", true),
+			}
+			res, err := EvaluateDispatchRule(projectID, tr, &testDR, req)
+			require.NoError(t, err)
+			require.Equal(t, rpc.SIPDispatchResult_ACCEPT, res.Result)
+			require.Regexp(t, `^`+regexp.QuoteMeta(caller)+`_[a-zA-Z0-9]+$`, res.RoomName, "room name should be from_guid")
+		})
+		t.Run("only pin", func(t *testing.T) {
+			testDR := livekit.SIPDispatchRuleInfo{
+				SipDispatchRuleId: "rule",
+				Rule:              newIndividualDispatch("", "123", false),
+			}
+			res, err := EvaluateDispatchRule(projectID, tr, &testDR, req)
+			require.NoError(t, err)
+			require.Equal(t, rpc.SIPDispatchResult_REQUEST_PIN, res.Result)
+			require.Empty(t, res.RoomName, "implementation does not set RoomName when returning REQUEST_PIN")
+		})
+		t.Run("prefix and randomize", func(t *testing.T) {
+			testDR := livekit.SIPDispatchRuleInfo{
+				SipDispatchRuleId: "rule",
+				Rule:              newIndividualDispatch(prefix, "", true),
+			}
+			res, err := EvaluateDispatchRule(projectID, tr, &testDR, req)
+			require.NoError(t, err)
+			require.Equal(t, rpc.SIPDispatchResult_ACCEPT, res.Result)
+			require.Regexp(t, `^`+prefix+`_`+quotedCaller+`_[a-zA-Z0-9]+$`, res.RoomName, "room name should be prefix_from_guid")
+		})
+		t.Run("prefix and pin", func(t *testing.T) {
+			testDR := livekit.SIPDispatchRuleInfo{
+				SipDispatchRuleId: "rule",
+				Rule:              newIndividualDispatch(prefix, "123", false),
+			}
+			res, err := EvaluateDispatchRule(projectID, tr, &testDR, req)
+			require.NoError(t, err)
+			require.Equal(t, rpc.SIPDispatchResult_REQUEST_PIN, res.Result)
+			require.Empty(t, res.RoomName, "implementation does not set RoomName when returning REQUEST_PIN")
+		})
+		t.Run("randomize and pin", func(t *testing.T) {
+			testDR := livekit.SIPDispatchRuleInfo{
+				SipDispatchRuleId: "rule",
+				Rule:              newIndividualDispatch("", "123", true),
+			}
+			res, err := EvaluateDispatchRule(projectID, tr, &testDR, req)
+			require.NoError(t, err)
+			require.Equal(t, rpc.SIPDispatchResult_REQUEST_PIN, res.Result)
+			require.Empty(t, res.RoomName, "implementation does not set RoomName when returning REQUEST_PIN")
+		})
+		t.Run("all options", func(t *testing.T) {
+			testDR := livekit.SIPDispatchRuleInfo{
+				SipDispatchRuleId: "rule",
+				Rule:              newIndividualDispatch(prefix, "123", true),
+			}
+			res, err := EvaluateDispatchRule(projectID, tr, &testDR, req)
+			require.NoError(t, err)
+			// Rule requires PIN; request does not send one, so implementation returns REQUEST_PIN.
+			require.Equal(t, rpc.SIPDispatchResult_REQUEST_PIN, res.Result)
+			require.Empty(t, res.RoomName, "implementation does not set RoomName when returning REQUEST_PIN")
+		})
+	})
+}
+
+func TestEvaluateDispatchRuleMediaConfig(t *testing.T) {
+	newDisp := func() *livekit.SIPDispatchRuleInfo {
+		return &livekit.SIPDispatchRuleInfo{
+			SipDispatchRuleId: "rule",
+			Rule:              newDirectDispatch("room", ""),
+		}
+	}
+	newReq := func() *rpc.EvaluateSIPDispatchRulesRequest {
+		return &rpc.EvaluateSIPDispatchRulesRequest{
+			SipCallId:     "call-id",
+			CallingNumber: "+11112222",
+			CallingHost:   "sip.example.com",
+			CalledNumber:  "+3333",
+		}
+	}
+	newTrunk := func() *livekit.SIPInboundTrunkInfo {
+		return &livekit.SIPInboundTrunkInfo{
+			SipTrunkId: "trunk",
+		}
+	}
+	check := func(
+		t testing.TB,
+		d *livekit.SIPDispatchRuleInfo, tr *livekit.SIPInboundTrunkInfo,
+		media *livekit.SIPMediaConfig,
+	) {
+		r := newReq()
+		res, err := EvaluateDispatchRule("p_123", tr, d, r)
+		require.NoError(t, err)
+		require.Equal(t, media.Encryption.Deref(), res.MediaEncryption)
+		require.NotNil(t, res.Media)
+		prototest.Equals(t, media, res.Media)
+	}
+
+	t.Run("empty", func(t *testing.T) {
+		tr := newTrunk()
+
+		d := newDisp()
+
+		check(
+			t, d, tr,
+			&livekit.SIPMediaConfig{},
+		)
+	})
+	t.Run("trunk only legacy", func(t *testing.T) {
+		// Regression: trunk-level MediaEncryption must be honored when the dispatch rule specifies
+		// neither MediaEncryption nor Media. A prior version called rule.Upgrade() at the top of
+		// EvaluateDispatchRule, which pinned rule.Media.Encryption to rule.MediaEncryption (0)
+		// before the trunk was consulted, causing the inbound trunk's encryption setting to be
+		// silently dropped.
+		tr := newTrunk()
+		tr.MediaEncryption = livekit.SIPMediaEncryption_SIP_MEDIA_ENCRYPT_REQUIRE
+
+		d := newDisp()
+
+		check(
+			t, d, tr,
+			&livekit.SIPMediaConfig{
+				Encryption: new(livekit.SIPMediaEncryption_SIP_MEDIA_ENCRYPT_REQUIRE),
+			},
+		)
+	})
+	t.Run("dispatch only legacy", func(t *testing.T) {
+		tr := newTrunk()
+
+		d := newDisp()
+		d.MediaEncryption = livekit.SIPMediaEncryption_SIP_MEDIA_ENCRYPT_REQUIRE
+
+		check(
+			t, d, tr,
+			&livekit.SIPMediaConfig{
+				Encryption: new(livekit.SIPMediaEncryption_SIP_MEDIA_ENCRYPT_REQUIRE),
+			},
+		)
+	})
+	t.Run("trunk only media", func(t *testing.T) {
+		tr := newTrunk()
+		tr.Media = &livekit.SIPMediaConfig{
+			MediaTimeout: durationpb.New(10 * time.Second),
+			Encryption:   new(livekit.SIPMediaEncryption_SIP_MEDIA_ENCRYPT_REQUIRE),
+		}
+
+		d := newDisp()
+
+		check(
+			t, d, tr,
+			&livekit.SIPMediaConfig{
+				MediaTimeout: durationpb.New(10 * time.Second),
+				Encryption:   new(livekit.SIPMediaEncryption_SIP_MEDIA_ENCRYPT_REQUIRE),
+			},
+		)
+	})
+	t.Run("dispatch only media", func(t *testing.T) {
+		tr := newTrunk()
+
+		d := newDisp()
+		d.Media = &livekit.SIPMediaConfig{
+			MediaTimeout: durationpb.New(10 * time.Second),
+			Encryption:   new(livekit.SIPMediaEncryption_SIP_MEDIA_ENCRYPT_REQUIRE),
+		}
+
+		check(
+			t, d, tr,
+			&livekit.SIPMediaConfig{
+				MediaTimeout: durationpb.New(10 * time.Second),
+				Encryption:   new(livekit.SIPMediaEncryption_SIP_MEDIA_ENCRYPT_REQUIRE),
+			},
+		)
+	})
+	t.Run("both legacy", func(t *testing.T) {
+		tr := newTrunk()
+		tr.MediaEncryption = livekit.SIPMediaEncryption_SIP_MEDIA_ENCRYPT_REQUIRE
+
+		d := newDisp()
+		d.MediaEncryption = livekit.SIPMediaEncryption_SIP_MEDIA_ENCRYPT_ALLOW
+
+		check(
+			t, d, tr,
+			&livekit.SIPMediaConfig{
+				Encryption: new(livekit.SIPMediaEncryption_SIP_MEDIA_ENCRYPT_ALLOW),
+			},
+		)
+	})
+	t.Run("both media", func(t *testing.T) {
+		tr := newTrunk()
+		tr.Media = &livekit.SIPMediaConfig{
+			MediaTimeout: durationpb.New(15 * time.Second),
+			Encryption:   new(livekit.SIPMediaEncryption_SIP_MEDIA_ENCRYPT_REQUIRE),
+		}
+
+		d := newDisp()
+		d.Media = &livekit.SIPMediaConfig{
+			MediaTimeout: durationpb.New(10 * time.Second),
+			Encryption:   new(livekit.SIPMediaEncryption_SIP_MEDIA_ENCRYPT_ALLOW),
+		}
+
+		check(
+			t, d, tr,
+			&livekit.SIPMediaConfig{
+				MediaTimeout: durationpb.New(10 * time.Second),
+				Encryption:   new(livekit.SIPMediaEncryption_SIP_MEDIA_ENCRYPT_ALLOW),
+			},
+		)
+	})
+	t.Run("trunk legacy and dispatch media", func(t *testing.T) {
+		tr := newTrunk()
+		tr.MediaEncryption = livekit.SIPMediaEncryption_SIP_MEDIA_ENCRYPT_REQUIRE
+
+		d := newDisp()
+		d.Media = &livekit.SIPMediaConfig{
+			MediaTimeout: durationpb.New(10 * time.Second),
+			Encryption:   new(livekit.SIPMediaEncryption_SIP_MEDIA_ENCRYPT_ALLOW),
+		}
+
+		check(
+			t, d, tr,
+			&livekit.SIPMediaConfig{
+				MediaTimeout: durationpb.New(10 * time.Second),
+				Encryption:   new(livekit.SIPMediaEncryption_SIP_MEDIA_ENCRYPT_ALLOW),
+			},
+		)
+	})
+	t.Run("trunk media and dispatch legacy", func(t *testing.T) {
+		tr := newTrunk()
+		tr.Media = &livekit.SIPMediaConfig{
+			MediaTimeout: durationpb.New(10 * time.Second),
+			Encryption:   new(livekit.SIPMediaEncryption_SIP_MEDIA_ENCRYPT_REQUIRE),
+		}
+
+		d := newDisp()
+		d.MediaEncryption = livekit.SIPMediaEncryption_SIP_MEDIA_ENCRYPT_ALLOW
+
+		check(
+			t, d, tr,
+			&livekit.SIPMediaConfig{
+				MediaTimeout: durationpb.New(10 * time.Second),
+				Encryption:   new(livekit.SIPMediaEncryption_SIP_MEDIA_ENCRYPT_ALLOW),
+			},
+		)
+	})
+}
+
+func TestEvaluateDispatchRule_RespectsRuleMediaTimeout(t *testing.T) {
 	d := &livekit.SIPDispatchRuleInfo{
 		SipDispatchRuleId: "rule",
 		Rule:              newDirectDispatch("room", ""),
-		HidePhoneNumber:   false,
-		InboundNumbers:    nil,
-		Name:              "",
-		Metadata:          "rule-meta",
-		Attributes: map[string]string{
-			"rule-attr": "1",
+		Media: &livekit.SIPMediaConfig{
+			MediaTimeout: durationpb.New(5 * time.Minute),
 		},
 	}
 	r := &rpc.EvaluateSIPDispatchRulesRequest{
@@ -649,54 +1130,13 @@ func TestEvaluateDispatchRule(t *testing.T) {
 		CallingNumber: "+11112222",
 		CallingHost:   "sip.example.com",
 		CalledNumber:  "+3333",
-		ExtraAttributes: map[string]string{
-			"prov-attr": "1",
-		},
 	}
 	tr := &livekit.SIPInboundTrunkInfo{SipTrunkId: "trunk"}
 	res, err := EvaluateDispatchRule("p_123", tr, d, r)
 	require.NoError(t, err)
-	require.Equal(t, &rpc.EvaluateSIPDispatchRulesResponse{
-		ProjectId:           "p_123",
-		Result:              rpc.SIPDispatchResult_ACCEPT,
-		SipTrunkId:          "trunk",
-		SipDispatchRuleId:   "rule",
-		RoomName:            "room",
-		ParticipantIdentity: "sip_+11112222",
-		ParticipantName:     "Phone +11112222",
-		ParticipantMetadata: "rule-meta",
-		ParticipantAttributes: map[string]string{
-			"rule-attr":                   "1",
-			"prov-attr":                   "1",
-			livekit.AttrSIPCallID:         "call-id",
-			livekit.AttrSIPTrunkID:        "trunk",
-			livekit.AttrSIPDispatchRuleID: "rule",
-			livekit.AttrSIPPhoneNumber:    "+11112222",
-			livekit.AttrSIPTrunkNumber:    "+3333",
-			livekit.AttrSIPHostName:       "sip.example.com",
-		},
-	}, res)
-
-	d.HidePhoneNumber = true
-	res, err = EvaluateDispatchRule("p_123", tr, d, r)
-	require.NoError(t, err)
-	require.Equal(t, &rpc.EvaluateSIPDispatchRulesResponse{
-		ProjectId:           "p_123",
-		Result:              rpc.SIPDispatchResult_ACCEPT,
-		SipTrunkId:          "trunk",
-		SipDispatchRuleId:   "rule",
-		RoomName:            "room",
-		ParticipantIdentity: "sip_c15a31c71649a522",
-		ParticipantName:     "Phone 2222",
-		ParticipantMetadata: "rule-meta",
-		ParticipantAttributes: map[string]string{
-			"rule-attr":                   "1",
-			"prov-attr":                   "1",
-			livekit.AttrSIPCallID:         "call-id",
-			livekit.AttrSIPTrunkID:        "trunk",
-			livekit.AttrSIPDispatchRuleID: "rule",
-		},
-	}, res)
+	require.NotNil(t, res.Media)
+	require.NotNil(t, res.Media.MediaTimeout)
+	require.Equal(t, 5*time.Minute, res.Media.MediaTimeout.AsDuration())
 }
 
 func TestMatchIP(t *testing.T) {

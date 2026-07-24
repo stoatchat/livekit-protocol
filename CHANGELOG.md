@@ -1,5 +1,277 @@
 # github.com/livekit/protocol
 
+## 1.50.4
+
+### Patch Changes
+
+- feat: add simulation/redaction fields to MetricsRecordingHeader - [#1679](https://github.com/livekit/protocol/pull/1679) ([@chenghao-mou](https://github.com/chenghao-mou))
+
+## 1.50.3
+
+### Patch Changes
+
+- agent simulation: homogenizes Turn/Job/Run LLM/TTS/STT/Conversation metrics shapes - [#1673](https://github.com/livekit/protocol/pull/1673) ([@Bobronium](https://github.com/Bobronium))
+
+## 1.50.2
+
+## 1.50.1
+
+### Patch Changes
+
+- Fix recursive call to CreateSIPInboundTrunkRequest.ValidateResult. - [#1669](https://github.com/livekit/protocol/pull/1669) ([@alexfish8](https://github.com/alexfish8))
+
+- agent simulation JobMetrics: add TTS.cer, add STT/TTS words/chars counts, replace `jobs_failed` with `jobs_measured` - [#1670](https://github.com/livekit/protocol/pull/1670) ([@Bobronium](https://github.com/Bobronium))
+
+## 1.50.0
+
+### Minor Changes
+
+- agent: add `llm_node_tps` and `llm_node_ttfs` to `MetricsReport`, and an `AgentFalseInterruption` event to `AgentSessionEvent` - [#1661](https://github.com/livekit/protocol/pull/1661) ([@Bobronium](https://github.com/Bobronium))
+
+- agent_simulations: add JobMetrics/RunMetrics to SimulationRun — per-job quality metrics grouped by - [#1644](https://github.com/livekit/protocol/pull/1644) ([@Bobronium](https://github.com/Bobronium))
+  pipeline stage (stt/llm/tts/conversation, plus a per-turn timeline and headline
+  accuracy/experience scores) and run-level aggregates. Unset optional fields mean "not measured";
+
+- Add validation method variants that include information about soft errors. - [#1667](https://github.com/livekit/protocol/pull/1667) ([@alexfish8](https://github.com/alexfish8))
+
+### Patch Changes
+
+- add redaction flag in Job - [#1657](https://github.com/livekit/protocol/pull/1657) ([@chenghao-mou](https://github.com/chenghao-mou))
+
+- Add wait_until_answered to ConnectWhatsAppCallRequest. - [#1653](https://github.com/livekit/protocol/pull/1653) ([@anunaym14](https://github.com/anunaym14))
+
+- Relax SIP codec validation. - [#1656](https://github.com/livekit/protocol/pull/1656) ([@dennwc](https://github.com/dennwc))
+
+## 1.49.0
+
+### Minor Changes
+
+- Support cloud agent attributes in CRUD operations - [#1636](https://github.com/livekit/protocol/pull/1636) ([@rektdeckard](https://github.com/rektdeckard))
+
+### Patch Changes
+
+- Relax SIP outbound validation to support carriers. - [#1611](https://github.com/livekit/protocol/pull/1611) ([@dennwc](https://github.com/dennwc))
+
+## 1.48.2
+
+### Patch Changes
+
+- Enabling soft fail for sip validation - [#1650](https://github.com/livekit/protocol/pull/1650) ([@alexlivekit](https://github.com/alexlivekit))
+
+- Use camel case log name in `DataBlobKey` - [#1649](https://github.com/livekit/protocol/pull/1649) ([@ladvoc](https://github.com/ladvoc))
+
+## 1.48.1
+
+### Patch Changes
+
+- Data track schema metadata and storage - [#1553](https://github.com/livekit/protocol/pull/1553) ([@ladvoc](https://github.com/ladvoc))
+
+## 1.48.0
+
+### Minor Changes
+
+- Add PTF_USER_DATA to the PacketTrailerFeature enum for arbitrary per-frame user data. - [#1639](https://github.com/livekit/protocol/pull/1639) ([@chenosaurus](https://github.com/chenosaurus))
+
+- Introduce a participant RPC protobuf registry for well-known LiveKit RPCs. - [#1618](https://github.com/livekit/protocol/pull/1618) ([@dennwc](https://github.com/dennwc))
+
+- Add codec config to inbound and outbound SIP trunks. - [#1620](https://github.com/livekit/protocol/pull/1620) ([@dennwc](https://github.com/dennwc))
+
+### Patch Changes
+
+- Add capabilities to ParticipantInfo - [#1637](https://github.com/livekit/protocol/pull/1637) ([@1egoman](https://github.com/1egoman))
+
+- agent dev protocol to send down ServerInfo - [#1638](https://github.com/livekit/protocol/pull/1638) ([@davidzhao](https://github.com/davidzhao))
+
+## 1.47.0
+
+### Minor Changes
+
+- agent simulation: add SimulationMode to the Create request and run info, so a - [#1627](https://github.com/livekit/protocol/pull/1627) ([@Bobronium](https://github.com/Bobronium))
+  run can request audio mode. Unspecified stays TEXT, so existing callers are
+  unaffected.
+
+## 1.46.8
+
+## 1.46.7
+
+### Patch Changes
+
+- Add a feature map to internal SIPCall. - [#1615](https://github.com/livekit/protocol/pull/1615) ([@dennwc](https://github.com/dennwc))
+
+## 1.46.6
+
+### Patch Changes
+
+- Add prometheus metrics to ConfigObserver - [#1602](https://github.com/livekit/protocol/pull/1602) ([@fede1024](https://github.com/fede1024))
+
+## 1.46.5
+
+### Patch Changes
+
+- feat(inference): add default thresholds in session created message - [#1598](https://github.com/livekit/protocol/pull/1598) ([@chenghao-mou](https://github.com/chenghao-mou))
+
+## 1.46.4
+
+## 1.46.3
+
+### Patch Changes
+
+- Add custom event protobuf for agent remote session - [#1588](https://github.com/livekit/protocol/pull/1588) ([@toubatbrian](https://github.com/toubatbrian))
+
+## 1.46.2
+
+### Patch Changes
+
+- Allow specifying exact To header and request line for SIP outbound. - [#1577](https://github.com/livekit/protocol/pull/1577) ([@dennwc](https://github.com/dennwc))
+
+## 1.46.1
+
+### Patch Changes
+
+- feat(agents): add function call start event - [#1571](https://github.com/livekit/protocol/pull/1571) ([@chenghao-mou](https://github.com/chenghao-mou))
+
+## 1.46.0
+
+### Minor Changes
+
+- Adding ability to specify media timeout per CreateSIPParticipant request and per Dispatch Rule. - [#1534](https://github.com/livekit/protocol/pull/1534) ([@alexlivekit](https://github.com/alexlivekit))
+
+### Patch Changes
+
+- feat(eot): add eot prediction event and usage - [#1566](https://github.com/livekit/protocol/pull/1566) ([@chenghao-mou](https://github.com/chenghao-mou))
+
+- Adding a test for EvaluateDispatchRule - [#1555](https://github.com/livekit/protocol/pull/1555) ([@alexlivekit](https://github.com/alexlivekit))
+
+- Wrap SIP validation errors with typed psrpc codes (`InvalidArgument` for unsupported dispatch rule and inbound trunk auth, `FailedPrecondition` for outbound trunk missing numbers) so Twirp surfaces them as 4xx instead of 500. Also fix `SIPStatus.GRPCStatus()` fallback ladder which compared the wrong variable. - [#1565](https://github.com/livekit/protocol/pull/1565) ([@hechen-eng](https://github.com/hechen-eng))
+
+- Fix SIP trunk-level MediaEncryption being silently dropped on outbound and inbound calls. The early `req.Upgrade()` / `rule.Upgrade()` calls pinned `Media.Encryption` to the (legacy) request/rule field before the trunk's MediaEncryption was merged, causing INVITEs to omit SRTP when only the trunk had it configured. - [#1540](https://github.com/livekit/protocol/pull/1540) ([@hechen-eng](https://github.com/hechen-eng))
+
+- Add optional authentication realm to SIPInboundTrunk. - [#1558](https://github.com/livekit/protocol/pull/1558) ([@dennwc](https://github.com/dennwc))
+
+## 1.45.8
+
+### Patch Changes
+
+- Allow setting a list of SIP codecs for SDP. - [#1530](https://github.com/livekit/protocol/pull/1530) ([@dennwc](https://github.com/dennwc))
+
+- fix: ensure we don't reject tokens on unknown fields - [#1536](https://github.com/livekit/protocol/pull/1536) ([@davidzhao](https://github.com/davidzhao))
+
+## 1.45.7
+
+### Patch Changes
+
+- feat(agents): add session events for amd - [#1526](https://github.com/livekit/protocol/pull/1526) ([@chenghao-mou](https://github.com/chenghao-mou))
+
+## 1.45.6
+
+### Patch Changes
+
+- Add turn detection protobufs - [#1485](https://github.com/livekit/protocol/pull/1485) ([@chenghao-mou](https://github.com/chenghao-mou))
+
+- fix change set for eot changes - [#1515](https://github.com/livekit/protocol/pull/1515) ([@chenghao-mou](https://github.com/chenghao-mou))
+
+## 1.45.5
+
+## 1.45.4
+
+## 1.45.3
+
+### Patch Changes
+
+- Add SUSPENDED node state. - [#1486](https://github.com/livekit/protocol/pull/1486) ([@boks1971](https://github.com/boks1971))
+
+## 1.45.2
+
+## 1.45.1
+
+### Patch Changes
+
+- Dropping use of an affinity function in CreateSIPParticipant - [#1456](https://github.com/livekit/protocol/pull/1456) ([@alexlivekit](https://github.com/alexlivekit))
+
+## 1.45.0
+
+### Minor Changes
+
+- Add PayloadTrailerFeature to TrackInfo and AddTrackRequest - [#1438](https://github.com/livekit/protocol/pull/1438) ([@chenosaurus](https://github.com/chenosaurus))
+
+### Patch Changes
+
+- Added NoRandomness field to individual dispatch rule" - [#1426](https://github.com/livekit/protocol/pull/1426) ([@alexlivekit](https://github.com/alexlivekit))
+
+## 1.44.1
+
+### Patch Changes
+
+- update text message protocol for http endpoints - [#1407](https://github.com/livekit/protocol/pull/1407) ([@longcw](https://github.com/longcw))
+
+- Adding feature_flags field to InternalTransferSIPParticipantRequest, InternalCreateSIPParticipantRequest, and EvaluateSIPDispatchRulesResponse - [#1382](https://github.com/livekit/protocol/pull/1382) ([@alexlivekit](https://github.com/alexlivekit))
+
+## 1.44.0
+
+### Minor Changes
+
+- Add numbers field to SIPDispatchRuleInfo for filtering calls by called number - [#1351](https://github.com/livekit/protocol/pull/1351) ([@civilcoder55](https://github.com/civilcoder55))
+
+### Patch Changes
+
+- Add auto_subscribe_data_track to StartSession. - [#1366](https://github.com/livekit/protocol/pull/1366) ([@boks1971](https://github.com/boks1971))
+
+- Add TextMessageRequest and TextMessageResponse - [#1349](https://github.com/livekit/protocol/pull/1349) ([@longcw](https://github.com/longcw))
+
+- Add featureinfo nested field for reporting noise cancellation feature specific metadata - [#1367](https://github.com/livekit/protocol/pull/1367) ([@1egoman](https://github.com/1egoman))
+
+- Option to control auto subscribe of data tracks. - [#1365](https://github.com/livekit/protocol/pull/1365) ([@boks1971](https://github.com/boks1971))
+
+- Changing the wording on duplicate dispatch rule error message - [#1343](https://github.com/livekit/protocol/pull/1343) ([@alexlivekit](https://github.com/alexlivekit))
+
+- Allow passing ClientParams to SIP RPC client. - [#1356](https://github.com/livekit/protocol/pull/1356) ([@dennwc](https://github.com/dennwc))
+
+- Add project ID to internal SIPCall info. - [#1346](https://github.com/livekit/protocol/pull/1346) ([@dennwc](https://github.com/dennwc))
+
+- Add helpers for tracing attributes. - [#1363](https://github.com/livekit/protocol/pull/1363) ([@dennwc](https://github.com/dennwc))
+
+- Add helper for setting Jaeger tracing. - [#1355](https://github.com/livekit/protocol/pull/1355) ([@dennwc](https://github.com/dennwc))
+
+- Store repair ssrc in TrackInfo for migration purposes. - [#1348](https://github.com/livekit/protocol/pull/1348) ([@boks1971](https://github.com/boks1971))
+
+## 1.43.4
+
+### Patch Changes
+
+- add tags to agent recording proto - [#1328](https://github.com/livekit/protocol/pull/1328) ([@paulwe](https://github.com/paulwe))
+
+## 1.43.3
+
+### Patch Changes
+
+- Data tracks initial protocol definition. - [#1327](https://github.com/livekit/protocol/pull/1327) ([@boks1971](https://github.com/boks1971))
+
+- Cancellation counts for join/publish/subscribe. - [#1321](https://github.com/livekit/protocol/pull/1321) ([@boks1971](https://github.com/boks1971))
+
+- Add ai coustics feature usage - [#1324](https://github.com/livekit/protocol/pull/1324) ([@lukasIO](https://github.com/lukasIO))
+
+## 1.43.2
+
+## 1.43.1
+
+### Patch Changes
+
+- add option to only use IPv4 for webhooks - [#1296](https://github.com/livekit/protocol/pull/1296) ([@davidzhao](https://github.com/davidzhao))
+
+- Redact metadata, attribute, participant name from logs. - [#1309](https://github.com/livekit/protocol/pull/1309) ([@boks1971](https://github.com/boks1971))
+
+- Adding more SIP return codes and updating SIP-to-grpc return code mapping - [#1305](https://github.com/livekit/protocol/pull/1305) ([@alexlivekit](https://github.com/alexlivekit))
+
+- Switch to new header validation for SIP commands - [#1279](https://github.com/livekit/protocol/pull/1279) ([@alexlivekit](https://github.com/alexlivekit))
+
+## 1.43.0
+
+### Patch Changes
+
+- Added warning prints to SIP headers - [#1238](https://github.com/livekit/protocol/pull/1238) ([@alexlivekit](https://github.com/alexlivekit))
+
+- removed observability field - [#1294](https://github.com/livekit/protocol/pull/1294) ([@davidzhao](https://github.com/davidzhao))
+
 ## 1.42.2
 
 ### Patch Changes

@@ -1,5 +1,350 @@
 # @livekit/protocol
 
+## 1.50.4
+
+### Patch Changes
+
+- feat: add simulation/redaction fields to MetricsRecordingHeader - [#1679](https://github.com/livekit/protocol/pull/1679) ([@chenghao-mou](https://github.com/chenghao-mou))
+
+## 1.50.3
+
+## 1.50.2
+
+### Patch Changes
+
+- Export the agent simulation protos (Scenario, SimulationDispatch, SimulationMode, SimulationRun, ...) from the JS package root - [#1674](https://github.com/livekit/protocol/pull/1674) ([@u9g](https://github.com/u9g))
+
+## 1.50.1
+
+### Patch Changes
+
+- Fix recursive call to CreateSIPInboundTrunkRequest.ValidateResult. - [#1669](https://github.com/livekit/protocol/pull/1669) ([@alexfish8](https://github.com/alexfish8))
+
+## 1.50.0
+
+### Minor Changes
+
+- Add validation method variants that include information about soft errors. - [#1667](https://github.com/livekit/protocol/pull/1667) ([@alexfish8](https://github.com/alexfish8))
+
+### Patch Changes
+
+- add redaction flag in Job - [#1657](https://github.com/livekit/protocol/pull/1657) ([@chenghao-mou](https://github.com/chenghao-mou))
+
+- Add wait_until_answered to ConnectWhatsAppCallRequest. - [#1653](https://github.com/livekit/protocol/pull/1653) ([@anunaym14](https://github.com/anunaym14))
+
+## 1.49.0
+
+### Minor Changes
+
+- Support cloud agent attributes in CRUD operations - [#1636](https://github.com/livekit/protocol/pull/1636) ([@rektdeckard](https://github.com/rektdeckard))
+
+### Patch Changes
+
+- add job id in MetricsRecordingHeader for chat log re-injection - [#1646](https://github.com/livekit/protocol/pull/1646) ([@chenghao-mou](https://github.com/chenghao-mou))
+
+## 1.48.2
+
+### Patch Changes
+
+- Use camel case log name in `DataBlobKey` - [#1649](https://github.com/livekit/protocol/pull/1649) ([@ladvoc](https://github.com/ladvoc))
+
+## 1.48.1
+
+### Patch Changes
+
+- Data track schema metadata and storage - [#1553](https://github.com/livekit/protocol/pull/1553) ([@ladvoc](https://github.com/ladvoc))
+
+## 1.48.0
+
+### Minor Changes
+
+- Add PTF_USER_DATA to the PacketTrailerFeature enum for arbitrary per-frame user data. - [#1639](https://github.com/livekit/protocol/pull/1639) ([@chenosaurus](https://github.com/chenosaurus))
+
+- Introduce a participant RPC protobuf registry for well-known LiveKit RPCs. - [#1618](https://github.com/livekit/protocol/pull/1618) ([@dennwc](https://github.com/dennwc))
+
+- Add codec config to inbound and outbound SIP trunks. - [#1620](https://github.com/livekit/protocol/pull/1620) ([@dennwc](https://github.com/dennwc))
+
+### Patch Changes
+
+- Add capabilities to ParticipantInfo - [#1637](https://github.com/livekit/protocol/pull/1637) ([@1egoman](https://github.com/1egoman))
+
+- agent dev protocol to send down ServerInfo - [#1638](https://github.com/livekit/protocol/pull/1638) ([@davidzhao](https://github.com/davidzhao))
+
+## 1.47.0
+
+## 1.46.8
+
+### Patch Changes
+
+- Add CAP_COMPRESSION_DEFLATE_RAW and data stream fields for compression and inline payloads - [#1621](https://github.com/livekit/protocol/pull/1621) ([@1egoman](https://github.com/1egoman))
+
+## 1.46.7
+
+### Patch Changes
+
+- add backchannel probability to the eot prediction - [#1624](https://github.com/livekit/protocol/pull/1624) ([@chenghao-mou](https://github.com/chenghao-mou))
+
+## 1.46.6
+
+## 1.46.5
+
+## 1.46.4
+
+### Patch Changes
+
+- agent_session: rename `CustomEvent` → `DebugMessage`; drop `type` field, keep only `payload` - [#1593](https://github.com/livekit/protocol/pull/1593) ([@toubatbrian](https://github.com/toubatbrian))
+
+  Renames the agent-session event added in #1588 before any consumer ships it. The
+  message is repositioned as an internal debug/trace channel surfaced only to the
+  debugger/recorder, not to user code, so the `type` discriminator was unnecessary
+  — callers just emit a JSON `payload`.
+
+  Wire-level: `AgentSessionEvent.custom_event` (field 21) → `AgentSessionEvent.debug_message`
+  (same field number 21, same type slot, no schema-compat concerns since nothing
+  has been built against it yet downstream).
+
+## 1.46.3
+
+## 1.46.2
+
+### Patch Changes
+
+- remove the stale proto export - [#1584](https://github.com/livekit/protocol/pull/1584) ([@chenghao-mou](https://github.com/chenghao-mou))
+
+- Add Krisp Viva to FeatureUsageInfo enum - [#1583](https://github.com/livekit/protocol/pull/1583) ([@lukasIO](https://github.com/lukasIO))
+
+- Allow specifying exact To header and request line for SIP outbound. - [#1577](https://github.com/livekit/protocol/pull/1577) ([@dennwc](https://github.com/dennwc))
+
+## 1.46.1
+
+### Patch Changes
+
+- export missing proto messages - [#1582](https://github.com/livekit/protocol/pull/1582) ([@chenghao-mou](https://github.com/chenghao-mou))
+
+- add logger.UnredactedProto helper that skips field redaction - [#1578](https://github.com/livekit/protocol/pull/1578) ([@paulwe](https://github.com/paulwe))
+
+## 1.46.0
+
+### Patch Changes
+
+- add local protojson with permissive defaults - [#1542](https://github.com/livekit/protocol/pull/1542) ([@paulwe](https://github.com/paulwe))
+
+- Fix SIP trunk-level MediaEncryption being silently dropped on outbound and inbound calls. The early `req.Upgrade()` / `rule.Upgrade()` calls pinned `Media.Encryption` to the (legacy) request/rule field before the trunk's MediaEncryption was merged, causing INVITEs to omit SRTP when only the trunk had it configured. - [#1540](https://github.com/livekit/protocol/pull/1540) ([@hechen-eng](https://github.com/hechen-eng))
+
+- Add optional authentication realm to SIPInboundTrunk. - [#1558](https://github.com/livekit/protocol/pull/1558) ([@dennwc](https://github.com/dennwc))
+
+- Add TokenPagination field to ListEgress API and RPC - [#1556](https://github.com/livekit/protocol/pull/1556) ([@biglittlebigben](https://github.com/biglittlebigben))
+
+## 1.45.8
+
+### Patch Changes
+
+- rename agent environment to deployment - [#1532](https://github.com/livekit/protocol/pull/1532) ([@paulwe](https://github.com/paulwe))
+
+- Allow setting a list of SIP codecs for SDP. - [#1530](https://github.com/livekit/protocol/pull/1530) ([@dennwc](https://github.com/dennwc))
+
+## 1.45.7
+
+### Patch Changes
+
+- update observability codegen for ingress/egress - [#1529](https://github.com/livekit/protocol/pull/1529) ([@paulwe](https://github.com/paulwe))
+
+- add agents reporter with env - [#1525](https://github.com/livekit/protocol/pull/1525) ([@paulwe](https://github.com/paulwe))
+
+- Fix the egress results serialization format - [#1521](https://github.com/livekit/protocol/pull/1521) ([@biglittlebigben](https://github.com/biglittlebigben))
+
+- update otel - [#1524](https://github.com/livekit/protocol/pull/1524) ([@paulwe](https://github.com/paulwe))
+
+- Agent env - [#1527](https://github.com/livekit/protocol/pull/1527) ([@paulwe](https://github.com/paulwe))
+
+- codegen observability parent tx accessors - [#1522](https://github.com/livekit/protocol/pull/1522) ([@paulwe](https://github.com/paulwe))
+
+- add duration seconds reporting - [#1528](https://github.com/livekit/protocol/pull/1528) ([@paulwe](https://github.com/paulwe))
+
+## 1.45.6
+
+## 1.45.5
+
+### Patch Changes
+
+- export alphabets used in guids - [#1508](https://github.com/livekit/protocol/pull/1508) ([@paulwe](https://github.com/paulwe))
+
+## 1.45.4
+
+### Patch Changes
+
+- Create room tags - [#1504](https://github.com/livekit/protocol/pull/1504) ([@paulwe](https://github.com/paulwe))
+
+- Export analytics proto - [#1501](https://github.com/livekit/protocol/pull/1501) ([@lukasIO](https://github.com/lukasIO))
+
+- add TimedString proto for word-level alignment metadata in agent - [#1502](https://github.com/livekit/protocol/pull/1502) ([@longcw](https://github.com/longcw))
+
+- move proto options to use lk reserved range - [#1495](https://github.com/livekit/protocol/pull/1495) ([@paulwe](https://github.com/paulwe))
+
+## 1.45.3
+
+### Patch Changes
+
+- Add SUSPENDED node state. - [#1486](https://github.com/livekit/protocol/pull/1486) ([@boks1971](https://github.com/boks1971))
+
+- Add get_framework_info request/response support in agent session protocol and regenerate JavaScript protobuf types. - [#1493](https://github.com/livekit/protocol/pull/1493) ([@toubatbrian](https://github.com/toubatbrian))
+
+## 1.45.2
+
+### Patch Changes
+
+- add room name and start time to agent MetricsRecordingHeader - [#1474](https://github.com/livekit/protocol/pull/1474) ([@paulwe](https://github.com/paulwe))
+
+- feat(rpc/room): add `ListParticipants` and `GetParticipant` - [#1459](https://github.com/livekit/protocol/pull/1459) ([@sohbit](https://github.com/sohbit))
+
+- add `Frame ID` packet trailer feature - [#1453](https://github.com/livekit/protocol/pull/1453) ([@chenosaurus](https://github.com/chenosaurus))
+
+## 1.45.1
+
+### Patch Changes
+
+- add generic list type - [#1449](https://github.com/livekit/protocol/pull/1449) ([@paulwe](https://github.com/paulwe))
+
+- add livekit_agent_simulation service, agent remote session proto & cli dev proto - [#1404](https://github.com/livekit/protocol/pull/1404) ([@theomonnom](https://github.com/theomonnom))
+
+- fix flaky test - [#1445](https://github.com/livekit/protocol/pull/1445) ([@paulwe](https://github.com/paulwe))
+
+- require logger name - [#1444](https://github.com/livekit/protocol/pull/1444) ([@paulwe](https://github.com/paulwe))
+
+- normalize protobuf "id" log field names - [#1451](https://github.com/livekit/protocol/pull/1451) ([@paulwe](https://github.com/paulwe))
+
+- encode monotonic time in wall clock - [#1439](https://github.com/livekit/protocol/pull/1439) ([@paulwe](https://github.com/paulwe))
+
+- Allow sips: scheme in transfer URIs. - [#1446](https://github.com/livekit/protocol/pull/1446) ([@dennwc](https://github.com/dennwc))
+
+- export discard logger - [#1457](https://github.com/livekit/protocol/pull/1457) ([@paulwe](https://github.com/paulwe))
+
+- Rename log field pID to participantID - [#1452](https://github.com/livekit/protocol/pull/1452) ([@paulwe](https://github.com/paulwe))
+
+## 1.45.0
+
+### Minor Changes
+
+- Add PayloadTrailerFeature to TrackInfo and AddTrackRequest - [#1438](https://github.com/livekit/protocol/pull/1438) ([@chenosaurus](https://github.com/chenosaurus))
+
+### Patch Changes
+
+- move out connector protos - [#1429](https://github.com/livekit/protocol/pull/1429) ([@paulwe](https://github.com/paulwe))
+
+- add AGENT_ERROR disconnect reason - [#1434](https://github.com/livekit/protocol/pull/1434) ([@theomonnom](https://github.com/theomonnom))
+
+## 1.44.1
+
+### Patch Changes
+
+- Redact ice server credentials in logs - [#1408](https://github.com/livekit/protocol/pull/1408) ([@biglittlebigben](https://github.com/biglittlebigben))
+
+- remove cloud only methods from reporter interface - [#1423](https://github.com/livekit/protocol/pull/1423) ([@paulwe](https://github.com/paulwe))
+
+- do not log sip auth field lengths - [#1421](https://github.com/livekit/protocol/pull/1421) ([@paulwe](https://github.com/paulwe))
+
+- add stack utility - [#1422](https://github.com/livekit/protocol/pull/1422) ([@paulwe](https://github.com/paulwe))
+
+- Changes for ingress observability support - [#1392](https://github.com/livekit/protocol/pull/1392) ([@biglittlebigben](https://github.com/biglittlebigben))
+
+- remove last cloud only obs method - [#1425](https://github.com/livekit/protocol/pull/1425) ([@paulwe](https://github.com/paulwe))
+
+- update room observability codegen - [#1395](https://github.com/livekit/protocol/pull/1395) ([@paulwe](https://github.com/paulwe))
+
+- Sync schema versions - [#1385](https://github.com/livekit/protocol/pull/1385) ([@paulwe](https://github.com/paulwe))
+
+## 1.44.0
+
+### Patch Changes
+
+- Add auto_subscribe_data_track to StartSession. - [#1366](https://github.com/livekit/protocol/pull/1366) ([@boks1971](https://github.com/boks1971))
+
+- add helper to propagate psrpc request timeout - [#1361](https://github.com/livekit/protocol/pull/1361) ([@paulwe](https://github.com/paulwe))
+
+- skip logging redacted fields with zero values - [#1338](https://github.com/livekit/protocol/pull/1338) ([@paulwe](https://github.com/paulwe))
+
+- redact metadata in agent protos - [#1344](https://github.com/livekit/protocol/pull/1344) ([@paulwe](https://github.com/paulwe))
+
+- Add featureinfo nested field for reporting noise cancellation feature specific metadata - [#1367](https://github.com/livekit/protocol/pull/1367) ([@1egoman](https://github.com/1egoman))
+
+- update observability codegen - [#1335](https://github.com/livekit/protocol/pull/1335) ([@paulwe](https://github.com/paulwe))
+
+- Option to control auto subscribe of data tracks. - [#1365](https://github.com/livekit/protocol/pull/1365) ([@boks1971](https://github.com/boks1971))
+
+- Add project ID to internal SIPCall info. - [#1346](https://github.com/livekit/protocol/pull/1346) ([@dennwc](https://github.com/dennwc))
+
+- feat(whatsapp): add disconnect reason field for disconnect request - [#1341](https://github.com/livekit/protocol/pull/1341) ([@anunaym14](https://github.com/anunaym14))
+
+- redact egress assume_role_external_id in logs - [#1337](https://github.com/livekit/protocol/pull/1337) ([@paulwe](https://github.com/paulwe))
+
+- temporarily move extension ids to avoid etcd conflict - [#1352](https://github.com/livekit/protocol/pull/1352) ([@paulwe](https://github.com/paulwe))
+
+- Store repair ssrc in TrackInfo for migration purposes. - [#1348](https://github.com/livekit/protocol/pull/1348) ([@boks1971](https://github.com/boks1971))
+
+## 1.43.4
+
+### Patch Changes
+
+- Use string constant as parameter to twirp.NewErrorf - [#1326](https://github.com/livekit/protocol/pull/1326) ([@biglittlebigben](https://github.com/biglittlebigben))
+
+- add tags to agent recording proto - [#1328](https://github.com/livekit/protocol/pull/1328) ([@paulwe](https://github.com/paulwe))
+
+## 1.43.3
+
+### Patch Changes
+
+- Data tracks initial protocol definition. - [#1327](https://github.com/livekit/protocol/pull/1327) ([@boks1971](https://github.com/boks1971))
+
+- Cancellation counts for join/publish/subscribe. - [#1321](https://github.com/livekit/protocol/pull/1321) ([@boks1971](https://github.com/boks1971))
+
+- Add ai coustics feature usage - [#1324](https://github.com/livekit/protocol/pull/1324) ([@lukasIO](https://github.com/lukasIO))
+
+## 1.43.2
+
+### Patch Changes
+
+- fix call depth for override logger - [#1313](https://github.com/livekit/protocol/pull/1313) ([@paulwe](https://github.com/paulwe))
+
+- Generate agent protos - [#1318](https://github.com/livekit/protocol/pull/1318) ([@toubatbrian](https://github.com/toubatbrian))
+
+- add missing proto import - [#1317](https://github.com/livekit/protocol/pull/1317) ([@paulwe](https://github.com/paulwe))
+
+## 1.43.1
+
+### Patch Changes
+
+- add session features to room observability - [#1298](https://github.com/livekit/protocol/pull/1298) ([@paulwe](https://github.com/paulwe))
+
+- Redact metadata, attribute, participant name from logs. - [#1309](https://github.com/livekit/protocol/pull/1309) ([@boks1971](https://github.com/boks1971))
+
+- update room observability codegen - [#1307](https://github.com/livekit/protocol/pull/1307) ([@paulwe](https://github.com/paulwe))
+
+- Add redacted field options to egress fields - [#1286](https://github.com/livekit/protocol/pull/1286) ([@biglittlebigben](https://github.com/biglittlebigben))
+
+- update psrpc - [#1303](https://github.com/livekit/protocol/pull/1303) ([@paulwe](https://github.com/paulwe))
+
+- feat(connector): export protos from JS package - [#1311](https://github.com/livekit/protocol/pull/1311) ([@anunaym14](https://github.com/anunaym14))
+
+- add test for client middleware options - [#1306](https://github.com/livekit/protocol/pull/1306) ([@paulwe](https://github.com/paulwe))
+
+- add redact format option - [#1308](https://github.com/livekit/protocol/pull/1308) ([@paulwe](https://github.com/paulwe))
+
+## 1.43.0
+
+### Minor Changes
+
+- feat: initial connector implementation - [#1288](https://github.com/livekit/protocol/pull/1288) ([@anunaym14](https://github.com/anunaym14))
+
+### Patch Changes
+
+- removed observability field - [#1294](https://github.com/livekit/protocol/pull/1294) ([@davidzhao](https://github.com/davidzhao))
+
+- fix pretty-weeks-behave.md - [#1269](https://github.com/livekit/protocol/pull/1269) ([@paulwe](https://github.com/paulwe))
+
+- move rtp converter to separate util package - [#1267](https://github.com/livekit/protocol/pull/1267) ([@paulwe](https://github.com/paulwe))
+
+- add option to redact protobuf fields - [#1284](https://github.com/livekit/protocol/pull/1284) ([@paulwe](https://github.com/paulwe))
+
 ## 1.42.2
 
 ### Patch Changes

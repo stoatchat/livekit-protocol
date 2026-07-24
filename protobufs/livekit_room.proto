@@ -23,6 +23,8 @@ import "livekit_models.proto";
 import "livekit_egress.proto";
 import "livekit_agent_dispatch.proto";
 
+import "logger/options.proto";
+
 // Room service that can be performed on any node
 // they are Twirp-based HTTP req/responses
 service RoomService {
@@ -62,8 +64,8 @@ service RoomService {
   rpc UpdateRoomMetadata (UpdateRoomMetadataRequest) returns (Room);
 
   // Cloud-only
-  // a connected participant's track(s) to another room. Requires `roomAdmin` and `destinationRoom`. The forwarding will 
-  // stop when the participant leaves the room or `RemoveParticipant` has been called in the destination room. 
+  // Forward a connected participant's track(s) to another room. Requires `roomAdmin` and `destinationRoom`. The forwarding will
+  // stop when the participant leaves the room or `RemoveParticipant` has been called in the destination room.
   // A participant can be forwarded to multiple rooms. The destination room will be created if it does not exist.
   rpc ForwardParticipant(ForwardParticipantRequest) returns (ForwardParticipantResponse);
 
@@ -88,9 +90,14 @@ message CreateRoomRequest {
   // limit number of participants that can be in a room
   uint32 max_participants = 3;
   // override the node room is allocated to, for debugging
-  string node_id = 4;
+  string node_id = 4 [(logger.name) = "nodeID"];
   // metadata of room
-  string metadata = 5;
+  string metadata = 5 [
+    (logger.sensitivity) = SENSITIVITY_PII,
+    (logger.redact_format) = "<redacted ({{ .Size }} bytes)>"
+  ];
+  // search tags
+  map<string, string> tags = 15;
   // auto-egress configurations
   RoomEgress egress = 6;
   // playout delay of subscriber
@@ -104,7 +111,8 @@ message CreateRoomRequest {
 
   // Define agents that should be dispatched to this room
   repeated RoomAgentDispatch agents = 14;
-  // NEXT-ID: 15
+
+  // NEXT-ID: 16
 }
 
 message RoomEgress {
@@ -149,6 +157,9 @@ message RoomParticipantIdentity {
   string room = 1;
   // identity of the participant
   string identity = 2;
+  // Unix timestamp used to invalidate token whose nbf is before this value.
+  // Used only by RemoveParticipant; defaults to now(server)+leeway(1min) if left empty.
+  int64 revoke_token_ts = 3;
 }
 
 message RemoveParticipantResponse {
@@ -172,14 +183,23 @@ message UpdateParticipantRequest {
   string room = 1;
   string identity = 2;
   // metadata to update. skipping updates if left empty
-  string metadata = 3;
+  string metadata = 3 [
+    (logger.sensitivity) = SENSITIVITY_PII,
+    (logger.redact_format) = "<redacted ({{ .Size }} bytes)>"
+  ];
   // set to update the participant's permissions
   ParticipantPermission permission = 4;
   // display name to update
-  string name = 5;
+  string name = 5 [
+    (logger.sensitivity) = SENSITIVITY_PII,
+    (logger.redact_format) = "<redacted ({{ .Size }} bytes)>"
+  ];
   // attributes to update. it only updates attributes that have been set
   // to delete attributes, set the value to an empty string
-  map<string, string> attributes = 6;
+  map<string, string> attributes = 6 [
+    (logger.sensitivity) = SENSITIVITY_PII,
+    (logger.redact_format) = "<redacted ({{ .Size }} bytes)>"
+  ];
 }
 
 message UpdateSubscriptionsRequest {
@@ -219,7 +239,10 @@ message SendDataResponse {
 message UpdateRoomMetadataRequest {
   string room = 1;
   // metadata to update. skipping updates if left empty
-  string metadata = 2;
+  string metadata = 2 [
+    (logger.sensitivity) = SENSITIVITY_PII,
+    (logger.redact_format) = "<redacted ({{ .Size }} bytes)>"
+  ];
 }
 
 message RoomConfiguration {
@@ -231,7 +254,10 @@ message RoomConfiguration {
   // limit number of participants that can be in a room, excluding Egress and Ingress participants
   uint32 max_participants = 4;
   // metadata of room
-  string metadata = 11;
+  string metadata = 11 [
+    (logger.sensitivity) = SENSITIVITY_PII,
+    (logger.redact_format) = "<redacted ({{ .Size }} bytes)>"
+  ];
   // egress
   RoomEgress egress = 5;
   // playout delay of subscriber
@@ -244,7 +270,10 @@ message RoomConfiguration {
   // Define agents that should be dispatched to this room
   repeated RoomAgentDispatch agents = 10;
 
-  // NEXT_ID: 12
+  // Tags to attach to the room
+  map<string, string> tags = 12;
+
+  // NEXT_ID: 13
 }
 
 message ForwardParticipantRequest {
@@ -282,4 +311,3 @@ message PerformRpcRequest {
 message PerformRpcResponse {
   string payload = 1;
 }
-

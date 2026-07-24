@@ -15,20 +15,55 @@
 package logger
 
 import (
+	"bytes"
 	"encoding/base64"
 	"fmt"
 	"strconv"
+	"text/template"
 
 	"go.uber.org/zap/zapcore"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/types/dynamicpb"
+
+	"github.com/puzpuzpuz/xsync/v4"
+
+	"github.com/livekit/protocol/livekit/logger"
+	"github.com/livekit/protocol/utils/must"
 )
 
+// Proto returns a zapcore.ObjectMarshaler that redacts every field whose
+// (logger.sensitivity) is at or above SENSITIVITY_PII. Use in routine
+// application and debug logs.
 func Proto(val proto.Message) zapcore.ObjectMarshaler {
 	if val == nil {
 		return nil
 	}
-	return protoMarshaller{val.ProtoReflect()}
+	return protoMarshaller{m: val.ProtoReflect(), maxLevel: logger.Sensitivity_SENSITIVITY_UNSPECIFIED}
+}
+
+// UnredactedProto returns a zapcore.ObjectMarshaler that exposes PII-tier
+// fields while still redacting SECRET-tier fields (credentials, tokens, API
+// keys). Use only in observability events where operator context legitimately
+// requires user-identifying data.
+func UnredactedProto(val proto.Message) zapcore.ObjectMarshaler {
+	if val == nil {
+		return nil
+	}
+	return protoMarshaller{m: val.ProtoReflect(), maxLevel: logger.Sensitivity_SENSITIVITY_PII}
+}
+
+// ProtoWithLimit behaves like Proto, but when the message's wire size exceeds
+// maxBytes it logs a compact summary instead of the full contents: message
+// type, wire size, and top-level scalar fields (redacted per sensitivity,
+// long strings truncated), with repeated/map fields reduced to counts and
+// nested messages dropped. Use for messages of unbounded size, such as RPC
+// payloads.
+func ProtoWithLimit(val proto.Message, maxBytes int) zapcore.ObjectMarshaler {
+	if val == nil {
+		return nil
+	}
+	return protoMarshaller{m: val.ProtoReflect(), maxLevel: logger.Sensitivity_SENSITIVITY_UNSPECIFIED, maxSize: maxBytes}
 }
 
 var _ zapcore.ObjectMarshaler = protoMarshaller{}
@@ -36,34 +71,103 @@ var _ zapcore.ObjectMarshaler = protoMapMarshaller{}
 var _ zapcore.ArrayMarshaler = protoListMarshaller{}
 
 type protoMarshaller struct {
-	m protoreflect.Message
+	m        protoreflect.Message
+	maxLevel logger.Sensitivity
+	// maxSize is the wire size in bytes above which the message is logged as
+	// a summary instead of its full contents. 0 means no limit.
+	maxSize int
 }
 
 func (p protoMarshaller) MarshalLogObject(e zapcore.ObjectEncoder) error {
+	if !p.m.IsValid() {
+		return nil
+	}
+
+	if p.maxSize > 0 {
+		if size := proto.Size(p.m.Interface()); size > p.maxSize {
+			return p.marshalSummary(e, size)
+		}
+	}
+
 	fields := p.m.Descriptor().Fields()
 	for i := 0; i < fields.Len(); i++ {
 		f := fields.Get(i)
 		k := f.JSONName()
+		if proto.HasExtension(f.Options(), logger.E_Name) {
+			k = proto.GetExtension(f.Options(), logger.E_Name).(string)
+		}
 		v := p.m.Get(f)
+
+		if protoFieldIsZero(f, v) {
+			continue
+		}
+
+		if fieldSensitivity(f) > p.maxLevel {
+			e.AddString(k, marshalRedacted(f, v))
+			continue
+		}
 
 		if f.IsMap() {
 			if m := v.Map(); m.IsValid() {
-				e.AddObject(k, protoMapMarshaller{f, m})
+				e.AddObject(k, protoMapMarshaller{f: f, m: m, maxLevel: p.maxLevel})
 			}
 		} else if f.IsList() {
 			if m := v.List(); m.IsValid() {
-				e.AddArray(k, protoListMarshaller{f, m})
+				e.AddArray(k, protoListMarshaller{f: f, m: m, maxLevel: p.maxLevel})
 			}
 		} else {
-			marshalProtoField(k, f, v, e)
+			marshalProtoField(k, f, v, e, p.maxLevel)
 		}
 	}
 	return nil
 }
 
+// marshalSummary keeps top-level scalar fields, which do not meaningfully
+// contribute to message size, and reduces lists, maps, and long strings to
+// counts and sizes.
+func (p protoMarshaller) marshalSummary(e zapcore.ObjectEncoder, size int) error {
+	e.AddString("truncatedProto", string(p.m.Descriptor().FullName()))
+	e.AddInt("protoBytes", size)
+
+	fields := p.m.Descriptor().Fields()
+	for i := 0; i < fields.Len(); i++ {
+		f := fields.Get(i)
+		v := p.m.Get(f)
+		if protoFieldIsZero(f, v) {
+			continue
+		}
+		k := f.JSONName()
+		if proto.HasExtension(f.Options(), logger.E_Name) {
+			k = proto.GetExtension(f.Options(), logger.E_Name).(string)
+		}
+		switch {
+		case f.IsMap():
+			e.AddInt(k+"Count", v.Map().Len())
+		case f.IsList():
+			e.AddInt(k+"Count", v.List().Len())
+		case f.Kind() == protoreflect.MessageKind, f.Kind() == protoreflect.GroupKind:
+		case fieldSensitivity(f) > p.maxLevel:
+			e.AddString(k, marshalRedacted(f, v))
+		case f.Kind() == protoreflect.StringKind:
+			e.AddString(k, marshalTruncatedString(v.String()))
+		default:
+			marshalProtoField(k, f, v, e, p.maxLevel)
+		}
+	}
+	return nil
+}
+
+func marshalTruncatedString(s string) string {
+	if len(s) <= 256 {
+		return s
+	}
+	return fmt.Sprintf("%s... (%d bytes)", s[:256], len(s))
+}
+
 type protoMapMarshaller struct {
-	f protoreflect.FieldDescriptor
-	m protoreflect.Map
+	f        protoreflect.FieldDescriptor
+	m        protoreflect.Map
+	maxLevel logger.Sensitivity
 }
 
 func (p protoMapMarshaller) MarshalLogObject(e zapcore.ObjectEncoder) error {
@@ -79,15 +183,16 @@ func (p protoMapMarshaller) MarshalLogObject(e zapcore.ObjectEncoder) error {
 		case protoreflect.StringKind:
 			k = ki.String()
 		}
-		marshalProtoField(k, p.f.MapValue(), vi, e)
+		marshalProtoField(k, p.f.MapValue(), vi, e, p.maxLevel)
 		return true
 	})
 	return nil
 }
 
 type protoListMarshaller struct {
-	f protoreflect.FieldDescriptor
-	m protoreflect.List
+	f        protoreflect.FieldDescriptor
+	m        protoreflect.List
+	maxLevel logger.Sensitivity
 }
 
 func (p protoListMarshaller) MarshalLogArray(e zapcore.ArrayEncoder) error {
@@ -109,44 +214,30 @@ func (p protoListMarshaller) MarshalLogArray(e zapcore.ArrayEncoder) error {
 		case protoreflect.BytesKind:
 			e.AppendString(marshalProtoBytes(v.Bytes()))
 		case protoreflect.MessageKind:
-			e.AppendObject(protoMarshaller{v.Message()})
+			e.AppendObject(protoMarshaller{m: v.Message(), maxLevel: p.maxLevel})
 		}
 	}
 	return nil
 }
 
-func marshalProtoField(k string, f protoreflect.FieldDescriptor, v protoreflect.Value, e zapcore.ObjectEncoder) {
+func marshalProtoField(k string, f protoreflect.FieldDescriptor, v protoreflect.Value, e zapcore.ObjectEncoder, maxLevel logger.Sensitivity) {
 	switch f.Kind() {
 	case protoreflect.BoolKind:
-		if b := v.Bool(); b {
-			e.AddBool(k, b)
-		}
+		e.AddBool(k, v.Bool())
 	case protoreflect.EnumKind:
 		e.AddString(k, marshalProtoEnum(f, v))
 	case protoreflect.Int32Kind, protoreflect.Int64Kind, protoreflect.Sint32Kind, protoreflect.Sint64Kind, protoreflect.Sfixed32Kind, protoreflect.Sfixed64Kind:
-		if n := v.Int(); n != 0 {
-			e.AddInt64(k, n)
-		}
+		e.AddInt64(k, v.Int())
 	case protoreflect.Uint32Kind, protoreflect.Uint64Kind, protoreflect.Fixed32Kind, protoreflect.Fixed64Kind:
-		if n := v.Uint(); n != 0 {
-			e.AddUint64(k, n)
-		}
+		e.AddUint64(k, v.Uint())
 	case protoreflect.FloatKind, protoreflect.DoubleKind:
-		if n := v.Float(); n != 0 {
-			e.AddFloat64(k, n)
-		}
+		e.AddFloat64(k, v.Float())
 	case protoreflect.StringKind:
-		if s := v.String(); s != "" {
-			e.AddString(k, s)
-		}
+		e.AddString(k, v.String())
 	case protoreflect.BytesKind:
-		if b := v.Bytes(); len(b) != 0 {
-			e.AddString(k, marshalProtoBytes(b))
-		}
+		e.AddString(k, marshalProtoBytes(v.Bytes()))
 	case protoreflect.MessageKind:
-		if m := v.Message(); m.IsValid() {
-			e.AddObject(k, protoMarshaller{m})
-		}
+		e.AddObject(k, protoMarshaller{m: v.Message(), maxLevel: maxLevel})
 	}
 }
 
@@ -175,4 +266,91 @@ func marshalProtoBytes(b []byte) string {
 	default:
 		return fmt.Sprintf("%s... (%.2fGB)", s, float64(n)/float64(1<<30))
 	}
+}
+
+var redactTemplates = xsync.NewMap[string, *template.Template]()
+
+func marshalRedacted(f protoreflect.FieldDescriptor, v protoreflect.Value) string {
+	if !proto.HasExtension(f.Options(), logger.E_RedactFormat) {
+		return "<redacted>"
+	}
+
+	text := proto.GetExtension(f.Options(), logger.E_RedactFormat).(string)
+	tpl, _ := redactTemplates.LoadOrCompute(text, func() (*template.Template, bool) {
+		return template.Must(template.New("format").Parse(text)), false
+	})
+
+	var b bytes.Buffer
+	must.Do(tpl.Execute(&b, redactTemplateData{f, v}))
+	return b.String()
+}
+
+type redactTemplateData struct {
+	f protoreflect.FieldDescriptor
+	v protoreflect.Value
+}
+
+func (d redactTemplateData) TextName() string {
+	return d.f.TextName()
+}
+
+func (d redactTemplateData) Size() string {
+	msg := dynamicpb.NewMessage(d.f.ContainingMessage())
+
+	switch {
+	case d.f.IsList():
+		dst := msg.Mutable(d.f).List()
+		src := d.v.List()
+		for i := 0; i < src.Len(); i++ {
+			dst.Append(src.Get(i))
+		}
+	case d.f.IsMap():
+		dst := msg.Mutable(d.f).Map()
+		src := d.v.Map()
+		src.Range(func(k protoreflect.MapKey, v protoreflect.Value) bool {
+			dst.Set(k, v)
+			return true
+		})
+	default:
+		msg.Set(d.f, d.v)
+	}
+
+	return strconv.Itoa(proto.Size(msg.Interface()))
+}
+
+func fieldSensitivity(f protoreflect.FieldDescriptor) logger.Sensitivity {
+	if !proto.HasExtension(f.Options(), logger.E_Sensitivity) {
+		return logger.Sensitivity_SENSITIVITY_UNSPECIFIED
+	}
+	return proto.GetExtension(f.Options(), logger.E_Sensitivity).(logger.Sensitivity)
+}
+
+func protoFieldIsZero(f protoreflect.FieldDescriptor, v protoreflect.Value) bool {
+	if f.IsList() {
+		l := v.List()
+		return l == nil || l.Len() == 0
+	}
+	if f.IsMap() {
+		m := v.Map()
+		return m == nil || m.Len() == 0
+	}
+	switch f.Kind() {
+	case protoreflect.BoolKind:
+		return !v.Bool()
+	case protoreflect.EnumKind:
+		return false
+	case protoreflect.Int32Kind, protoreflect.Int64Kind, protoreflect.Sint32Kind, protoreflect.Sint64Kind, protoreflect.Sfixed32Kind, protoreflect.Sfixed64Kind:
+		return v.Int() == 0
+	case protoreflect.Uint32Kind, protoreflect.Uint64Kind, protoreflect.Fixed32Kind, protoreflect.Fixed64Kind:
+		return v.Uint() == 0
+	case protoreflect.FloatKind, protoreflect.DoubleKind:
+		return v.Float() == 0
+	case protoreflect.StringKind:
+		return v.String() == ""
+	case protoreflect.BytesKind:
+		return len(v.Bytes()) == 0
+	case protoreflect.MessageKind:
+		return !v.Message().IsValid()
+	}
+	return true
 }

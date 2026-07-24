@@ -19,20 +19,17 @@ import (
 	"maps"
 	"strings"
 
+	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/exp/slices"
-	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/livekit/protocol/livekit"
 	"github.com/livekit/protocol/logger"
 	"github.com/livekit/protocol/utils"
+	"github.com/livekit/protocol/utils/protojson"
 )
 
 type RoomConfiguration livekit.RoomConfiguration
-
-var tokenMarshaler = protojson.MarshalOptions{
-	EmitDefaultValues: false,
-}
 
 var ErrSensitiveCredentials = errors.New("room configuration should not contain sensitive credentials")
 
@@ -44,7 +41,7 @@ func (c *RoomConfiguration) Clone() *RoomConfiguration {
 }
 
 func (c *RoomConfiguration) MarshalJSON() ([]byte, error) {
-	return tokenMarshaler.Marshal((*livekit.RoomConfiguration)(c))
+	return protojson.Marshal((*livekit.RoomConfiguration)(c))
 }
 
 func (c *RoomConfiguration) UnmarshalJSON(data []byte) error {
@@ -165,6 +162,7 @@ type ClaimGrants struct {
 	Identity      string              `json:"identity,omitempty"`
 	Name          string              `json:"name,omitempty"`
 	Kind          string              `json:"kind,omitempty"`
+	KindDetails   []string            `json:"kindDetails,omitempty"`
 	Video         *VideoGrant         `json:"video,omitempty"`
 	SIP           *SIPGrant           `json:"sip,omitempty"`
 	Agent         *AgentGrant         `json:"agent,omitempty"`
@@ -190,6 +188,14 @@ func (c *ClaimGrants) GetParticipantKind() livekit.ParticipantInfo_Kind {
 	return kindToProto(c.Kind)
 }
 
+func (c *ClaimGrants) SetKindDetail(details ...livekit.ParticipantInfo_KindDetail) {
+	c.KindDetails = kindDetailsFromProto(details)
+}
+
+func (c *ClaimGrants) GetKindDetails() []livekit.ParticipantInfo_KindDetail {
+	return kindDetailsToProto(c.KindDetails)
+}
+
 func (c *ClaimGrants) GetRoomConfiguration() *livekit.RoomConfiguration {
 	if c.RoomConfig == nil {
 		return nil
@@ -210,6 +216,9 @@ func (c *ClaimGrants) Clone() *ClaimGrants {
 	clone.Observability = c.Observability.Clone()
 	clone.Attributes = maps.Clone(c.Attributes)
 	clone.RoomConfig = c.RoomConfig.Clone()
+	if len(c.KindDetails) > 0 {
+		clone.KindDetails = append([]string{}, c.KindDetails...)
+	}
 
 	return &clone
 }
@@ -221,6 +230,7 @@ func (c *ClaimGrants) MarshalLogObject(e zapcore.ObjectEncoder) error {
 
 	e.AddString("Identity", c.Identity)
 	e.AddString("Kind", c.Kind)
+	zap.Strings("KindDetails", c.KindDetails).AddTo(e)
 	e.AddObject("Video", c.Video)
 	e.AddObject("SIP", c.SIP)
 	e.AddObject("Agent", c.Agent)
@@ -268,6 +278,9 @@ type VideoGrant struct {
 	// if a participant can subscribe to metrics
 	CanSubscribeMetrics *bool `json:"canSubscribeMetrics,omitempty"`
 
+	// if a participant can manage an agent session via RemoteSession
+	CanManageAgentSession *bool `json:"canManageAgentSession,omitempty"`
+
 	// destination room which this participant can forward to
 	DestinationRoom string `json:"destinationRoom,omitempty"`
 }
@@ -297,6 +310,10 @@ func (v *VideoGrant) SetCanUpdateOwnMetadata(val bool) {
 
 func (v *VideoGrant) SetCanSubscribeMetrics(val bool) {
 	v.CanSubscribeMetrics = &val
+}
+
+func (v *VideoGrant) SetCanManageAgentSession(val bool) {
+	v.CanManageAgentSession = &val
 }
 
 func (v *VideoGrant) GetCanPublish() bool {
@@ -363,6 +380,13 @@ func (v *VideoGrant) GetCanSubscribeMetrics() bool {
 	return *v.CanSubscribeMetrics
 }
 
+func (v *VideoGrant) GetCanManageAgentSession() bool {
+	if v.CanManageAgentSession == nil {
+		return false
+	}
+	return *v.CanManageAgentSession
+}
+
 func (v *VideoGrant) MatchesPermission(permission *livekit.ParticipantPermission) bool {
 	if permission == nil {
 		return false
@@ -395,6 +419,9 @@ func (v *VideoGrant) MatchesPermission(permission *livekit.ParticipantPermission
 	if v.GetCanSubscribeMetrics() != permission.CanSubscribeMetrics {
 		return false
 	}
+	if v.GetCanManageAgentSession() != permission.CanManageAgentSession {
+		return false
+	}
 
 	return true
 }
@@ -413,6 +440,7 @@ func (v *VideoGrant) UpdateFromPermission(permission *livekit.ParticipantPermiss
 	v.Recorder = permission.Recorder
 	v.Agent = permission.Agent
 	v.SetCanSubscribeMetrics(permission.CanSubscribeMetrics)
+	v.SetCanManageAgentSession(permission.CanManageAgentSession)
 }
 
 func (v *VideoGrant) ToPermission() *livekit.ParticipantPermission {
@@ -425,7 +453,8 @@ func (v *VideoGrant) ToPermission() *livekit.ParticipantPermission {
 		Hidden:              v.Hidden,
 		Recorder:            v.Recorder,
 		Agent:               v.Agent,
-		CanSubscribeMetrics: v.GetCanSubscribeMetrics(),
+		CanSubscribeMetrics:   v.GetCanSubscribeMetrics(),
+		CanManageAgentSession: v.GetCanManageAgentSession(),
 	}
 }
 
@@ -459,6 +488,16 @@ func (v *VideoGrant) Clone() *VideoGrant {
 	if v.CanUpdateOwnMetadata != nil {
 		canUpdateOwnMetadata := *v.CanUpdateOwnMetadata
 		clone.CanUpdateOwnMetadata = &canUpdateOwnMetadata
+	}
+
+	if v.CanSubscribeMetrics != nil {
+		canSubscribeMetrics := *v.CanSubscribeMetrics
+		clone.CanSubscribeMetrics = &canSubscribeMetrics
+	}
+
+	if v.CanManageAgentSession != nil {
+		canManageAgentSession := *v.CanManageAgentSession
+		clone.CanManageAgentSession = &canManageAgentSession
 	}
 
 	return &clone
@@ -498,6 +537,7 @@ func (v *VideoGrant) MarshalLogObject(e zapcore.ObjectEncoder) error {
 	logBoolPtr("Agent", &v.Agent)
 
 	logBoolPtr("CanSubscribeMetrics", v.CanSubscribeMetrics)
+	logBoolPtr("CanManageAgentSession", v.CanManageAgentSession)
 	e.AddString("DestinationRoom", v.DestinationRoom)
 	return nil
 }
@@ -539,6 +579,8 @@ func (s *SIPGrant) MarshalLogObject(e zapcore.ObjectEncoder) error {
 type AgentGrant struct {
 	// Admin grants to create/update/delete Cloud Agents.
 	Admin bool `json:"admin,omitempty"`
+	// SimulationAdmin grants access to manage simulations and scenarios for evaluating agents.
+	SimulationAdmin bool `json:"simulationAdmin,omitempty"`
 }
 
 func (s *AgentGrant) Clone() *AgentGrant {
@@ -557,6 +599,7 @@ func (s *AgentGrant) MarshalLogObject(e zapcore.ObjectEncoder) error {
 	}
 
 	e.AddBool("Admin", s.Admin)
+	e.AddBool("SimulationAdmin", s.SimulationAdmin)
 	return nil
 }
 
@@ -619,18 +662,10 @@ func sourceToString(source livekit.TrackSource) string {
 }
 
 func sourceToProto(sourceStr string) livekit.TrackSource {
-	switch strings.ToLower(sourceStr) {
-	case "camera":
-		return livekit.TrackSource_CAMERA
-	case "microphone":
-		return livekit.TrackSource_MICROPHONE
-	case "screen_share":
-		return livekit.TrackSource_SCREEN_SHARE
-	case "screen_share_audio":
-		return livekit.TrackSource_SCREEN_SHARE_AUDIO
-	default:
-		return livekit.TrackSource_UNKNOWN
+	if val, ok := livekit.TrackSource_value[strings.ToUpper(sourceStr)]; ok {
+		return livekit.TrackSource(val)
 	}
+	return livekit.TrackSource_UNKNOWN
 }
 
 func kindFromProto(source livekit.ParticipantInfo_Kind) string {
@@ -638,18 +673,26 @@ func kindFromProto(source livekit.ParticipantInfo_Kind) string {
 }
 
 func kindToProto(sourceStr string) livekit.ParticipantInfo_Kind {
-	switch strings.ToLower(sourceStr) {
-	case "", "standard":
-		return livekit.ParticipantInfo_STANDARD
-	case "ingress":
-		return livekit.ParticipantInfo_INGRESS
-	case "egress":
-		return livekit.ParticipantInfo_EGRESS
-	case "sip":
-		return livekit.ParticipantInfo_SIP
-	case "agent":
-		return livekit.ParticipantInfo_AGENT
-	default:
-		return livekit.ParticipantInfo_STANDARD
+	if val, ok := livekit.ParticipantInfo_Kind_value[strings.ToUpper(sourceStr)]; ok {
+		return livekit.ParticipantInfo_Kind(val)
 	}
+	return livekit.ParticipantInfo_STANDARD
+}
+
+func kindDetailsFromProto(details []livekit.ParticipantInfo_KindDetail) []string {
+	result := make([]string, 0, len(details))
+	for _, d := range details {
+		result = append(result, strings.ToLower(d.String()))
+	}
+	return result
+}
+
+func kindDetailsToProto(details []string) []livekit.ParticipantInfo_KindDetail {
+	result := make([]livekit.ParticipantInfo_KindDetail, 0, len(details))
+	for _, d := range details {
+		if val, ok := livekit.ParticipantInfo_KindDetail_value[strings.ToUpper(d)]; ok {
+			result = append(result, livekit.ParticipantInfo_KindDetail(val))
+		}
+	}
+	return result
 }

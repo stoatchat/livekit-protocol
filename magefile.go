@@ -43,6 +43,7 @@ func Bootstrap() error {
 // regenerate protobuf
 func Proto() error {
 	twirpProtoFiles := []string{
+		"cloud_replay.proto",
 		"livekit_agent_dispatch.proto",
 		"livekit_egress.proto",
 		"livekit_ingress.proto",
@@ -53,10 +54,14 @@ func Proto() error {
 		"livekit_connector.proto",
 		"livekit_connector_whatsapp.proto",
 		"livekit_connector_twilio.proto",
+		"livekit_agent_simulation.proto",
+		"livekit_agent_worker.proto",
 	}
 
 	agentProtoFiles := []string{
 		"agent/livekit_agent_session.proto",
+		"agent/livekit_agent_dev.proto",
+		"agent/livekit_agent_inference.proto",
 	}
 
 	protoFiles := []string{
@@ -68,6 +73,7 @@ func Proto() error {
 		"livekit_webhook.proto",
 		"livekit_metrics.proto",
 		"livekit_token_source.proto",
+		"logger/options.proto",
 	}
 	grpcProtoFiles := []string{
 		"infra/link.proto",
@@ -86,12 +92,18 @@ func Proto() error {
 		"rpc/signal.proto",
 		"rpc/whip_signal.proto",
 		"rpc/sip.proto",
-		"rpc/connector.proto",
-		"rpc/common.proto",
+	}
+
+	// mapped proto directory:
+	//    ./protobufs/roomrpc/<name>rpc
+	// and generated Go package:
+	//    ./livekit/roomrpc/<name>rpc
+	roomrpcTypeNames := []string{
+		"sip",
 	}
 
 	fmt.Println("generating protobuf")
-	target := "livekit"
+	const target = "./livekit"
 	if err := os.MkdirAll(target, 0755); err != nil {
 		return err
 	}
@@ -129,23 +141,6 @@ func Proto() error {
 		return err
 	}
 
-	fmt.Println("generating replay twirp protobuf")
-	replayTarget := "replay"
-	args = append([]string{
-		"--go_out", replayTarget,
-		"--twirp_out", replayTarget,
-		"--go_opt=paths=source_relative",
-		"--twirp_opt=paths=source_relative",
-		"--plugin=go=" + protocGoPath,
-		"--plugin=twirp=" + twirpPath,
-		"-I=./protobufs",
-	}, "cloud_replay.proto")
-	cmd = exec.Command(protoc, args...)
-	connectStd(cmd)
-	if err := cmd.Run(); err != nil {
-		return err
-	}
-
 	fmt.Println("generating protobuf")
 	args = append([]string{
 		"--go_out", target,
@@ -168,6 +163,29 @@ func Proto() error {
 			"-I=./protobufs",
 		}
 		args = append(args, agentProtoFiles...)
+		cmd := exec.Command(protoc, args...)
+		connectStd(cmd)
+		if err := cmd.Run(); err != nil {
+			return err
+		}
+	}
+
+	fmt.Println("generating protobuf (livekit/roomrpc)")
+	for _, protoName := range roomrpcTypeNames {
+		pkgName := "roomrpc/" + protoName + "rpc"
+		protoFiles, err := os.ReadDir(filepath.Join("./protobufs", pkgName))
+		if err != nil {
+			return err
+		}
+		args := []string{
+			"--go_out", target,
+			"--go_opt=paths=source_relative",
+			"--plugin=go=" + protocGoPath,
+			"-I=./protobufs",
+		}
+		for _, protoFile := range protoFiles {
+			args = append(args, filepath.Join(pkgName, protoFile.Name()))
+		}
 		cmd := exec.Command(protoc, args...)
 		connectStd(cmd)
 		if err := cmd.Run(); err != nil {

@@ -20,6 +20,12 @@ option csharp_namespace = "LiveKit.Proto";
 option ruby_package = "LiveKit::Proto";
 
 import "livekit_agent.proto";
+import "logger/options.proto";
+
+enum JobRestartPolicy {
+  JRP_ON_FAILURE = 0; // restart when the job fails (default)
+  JRP_NEVER = 1;      // never restart
+}
 
 service AgentDispatchService {
   rpc CreateDispatch(CreateAgentDispatchRequest) returns (AgentDispatch);
@@ -30,21 +36,27 @@ service AgentDispatchService {
 message CreateAgentDispatchRequest {
   string agent_name = 1;
   string room = 2;
-  string metadata = 3;
+  string metadata = 3 [(logger.sensitivity) = SENSITIVITY_PII];
+  JobRestartPolicy restart_policy = 4; // cloud only
+  string deployment = 5;
+  map<string, string> attributes = 6 [(logger.sensitivity) = SENSITIVITY_PII];
 }
 
 message RoomAgentDispatch {
   string agent_name = 1;
-  string metadata = 2;
+  string metadata = 2 [(logger.sensitivity) = SENSITIVITY_PII];
+  JobRestartPolicy restart_policy = 3; // cloud only
+  string deployment = 4;
+  map<string, string> attributes = 5 [(logger.sensitivity) = SENSITIVITY_PII];
 }
 
 message DeleteAgentDispatchRequest {
-  string dispatch_id = 1;
+  string dispatch_id = 1 [(logger.name) = "dispatchID"];
   string room = 2;
 }
 
 message ListAgentDispatchRequest {
-  string dispatch_id = 1; // if set, only the dispatch whose id is given will be returned
+  string dispatch_id = 1 [(logger.name) = "dispatchID"]; // if set, only the dispatch whose id is given will be returned
   string room = 2;        // name of the room to list agents for. Must be set.
 }
 
@@ -56,12 +68,15 @@ message AgentDispatch {
   string id = 1;
   string agent_name = 2;
   string room = 3;
-  string metadata = 4;
+  string metadata = 4 [(logger.sensitivity) = SENSITIVITY_PII];
   AgentDispatchState state = 5;
+  JobRestartPolicy restart_policy = 6; // cloud only
+  string deployment = 7;
+  map<string, string> attributes = 8 [(logger.sensitivity) = SENSITIVITY_PII];
 }
 
 message AgentDispatchState {
-  // For dispatches of tyoe JT_ROOM, there will be at most 1 job. 
+  // For dispatches of tyoe JT_ROOM, there will be at most 1 job.
   // For dispatches of type JT_PUBLISHER, there will be 1 per publisher.
   repeated Job jobs = 1;
   int64 created_at = 2;

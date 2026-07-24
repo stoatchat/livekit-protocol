@@ -15,6 +15,9 @@
 package hwstats
 
 import (
+	"os"
+	"strconv"
+	"sync"
 	"time"
 
 	"github.com/frostbyte73/core"
@@ -26,6 +29,33 @@ import (
 
 // This object returns cgroup quota aware cpu stats. On other systems than Linux,
 // it falls back to full system stats
+
+const CPURequestEnvVar = "LIVEKIT_CPU_REQUEST"
+
+var (
+	effectiveCPURequestOnce sync.Once
+	effectiveCPURequest     float64
+)
+
+// EffectiveCPURequest returns the value of LIVEKIT_CPU_REQUEST when set and valid.
+// The result is parsed at most once; use for stats normalization and optional
+// GOMAXPROCS tuning (see utils/hwstats/maxprocs).
+func EffectiveCPURequest() float64 {
+	effectiveCPURequestOnce.Do(parseCPURequestEnv)
+	return effectiveCPURequest
+}
+
+func parseCPURequestEnv() {
+	cpuReq := os.Getenv(CPURequestEnvVar)
+	if cpuReq == "" {
+		return
+	}
+	n, err := strconv.ParseFloat(cpuReq, 64)
+	if err != nil || n <= 0 {
+		return
+	}
+	effectiveCPURequest = n
+}
 
 type platformCPUMonitor interface {
 	getCPUIdle() (float64, error)
@@ -42,11 +72,60 @@ type CPUStats struct {
 	closeChan       chan struct{}
 }
 
+type ProcMemoryEntry struct {
+	Name   string
+	Memory int
+}
+
+type GroupMemory struct {
+	Total int
+	Procs map[int]ProcMemoryEntry
+}
+
 type ProcStats struct {
 	CpuIdle     float64
 	Cpu         map[int]float64
 	MemoryTotal int
-	Memory      map[int]int
+	Memory      map[int]*GroupMemory
+}
+
+type procEntry struct {
+	pid  int
+	ppid int
+	comm string
+	rss  int
+}
+
+// aggregateMemoryStats groups processes by their top-level parent (first child of selfPID)
+// and computes per-group and total memory stats.
+func aggregateMemoryStats(entries []procEntry, selfPID, pageSize int) (memoryTotal int, memory map[int]*GroupMemory, groups map[int]int) {
+	ppids := make(map[int]int)
+	for _, e := range entries {
+		if e.pid != selfPID {
+			ppids[e.pid] = e.ppid
+		}
+	}
+
+	memory = make(map[int]*GroupMemory)
+	groups = make(map[int]int)
+	for _, e := range entries {
+		pidForGroup := e.pid
+		for ppids[pidForGroup] != selfPID && ppids[pidForGroup] != 0 {
+			pidForGroup = ppids[pidForGroup]
+		}
+		groups[e.pid] = pidForGroup
+
+		mem := e.rss * pageSize
+		gm := memory[pidForGroup]
+		if gm == nil {
+			gm = &GroupMemory{Procs: make(map[int]ProcMemoryEntry)}
+			memory[pidForGroup] = gm
+		}
+		gm.Total += mem
+		gm.Procs[e.pid] = ProcMemoryEntry{Name: e.comm, Memory: mem}
+		memoryTotal += mem
+	}
+	return
 }
 
 func NewCPUStats(idleUpdateCallback func(idle float64)) (*CPUStats, error) {
@@ -90,6 +169,9 @@ func (c *CPUStats) GetCPUIdle() float64 {
 }
 
 func (c *CPUStats) NumCPU() float64 {
+	if n := EffectiveCPURequest(); n > 0 {
+		return n
+	}
 	return c.platform.numCPU()
 }
 
@@ -137,7 +219,7 @@ func (c *CPUStats) monitorCPULoad() {
 }
 
 func (c *CPUStats) monitorProcesses() {
-	numCPU := c.platform.numCPU()
+	numCPU := c.NumCPU()
 	pageSize := getPageSize()
 
 	fs, err := procfs.NewFS(procfs.DefaultMountPoint)
@@ -180,7 +262,7 @@ func (c *CPUStats) monitorProcesses() {
 				continue
 			}
 
-			ppids := make(map[int]int)
+			var entries []procEntry
 			for _, proc := range procs {
 				stat, err := proc.Stat()
 				if err != nil {
@@ -188,41 +270,38 @@ func (c *CPUStats) monitorProcesses() {
 				}
 
 				procStats[proc.PID] = stat
-				if proc.PID != self.PID {
-					ppids[proc.PID] = stat.PPID
-				}
+				entries = append(entries, procEntry{
+					pid:  proc.PID,
+					ppid: stat.PPID,
+					comm: stat.Comm,
+					rss:  stat.RSS,
+				})
 			}
 
 			totalHostTime := total.CPUTotal.Idle + total.CPUTotal.Iowait +
 				total.CPUTotal.User + total.CPUTotal.Nice + total.CPUTotal.System +
 				total.CPUTotal.IRQ + total.CPUTotal.SoftIRQ + total.CPUTotal.Steal
 
+			memTotal, memory, groups := aggregateMemoryStats(entries, self.PID, pageSize)
 			stats := &ProcStats{
 				CpuIdle:     numCPU,
 				Cpu:         make(map[int]float64),
-				MemoryTotal: 0,
-				Memory:      make(map[int]int),
+				MemoryTotal: memTotal,
+				Memory:      memory,
 			}
 
 			for pid, stat := range procStats {
+				pidForGroup := groups[pid]
+
 				// process usage as percent of total host cpu
 				procPercentUsage := float64(stat.UTime + stat.STime - prevStats[pid].UTime - prevStats[pid].STime)
 				if procPercentUsage == 0 {
 					continue
 				}
 
-				for ppids[pid] != self.PID && ppids[pid] != 0 {
-					// bundle usage up to first child of main go process
-					pid = ppids[pid]
-				}
-
 				cpu := hostCPU * procPercentUsage / 100 / (totalHostTime - prevTotalTime)
-				stats.Cpu[pid] += cpu
+				stats.Cpu[pidForGroup] += cpu
 				stats.CpuIdle -= cpu
-
-				memory := stat.RSS * pageSize
-				stats.Memory[pid] += memory
-				stats.MemoryTotal += memory
 			}
 
 			c.idleCPUs.Store(stats.CpuIdle)

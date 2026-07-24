@@ -15,17 +15,18 @@
 syntax = "proto3";
 
 package livekit;
-option go_package = "github.com/livekit/protocol/livekit";
-option csharp_namespace = "LiveKit.Proto";
-option ruby_package = "LiveKit::Proto";
 
 import "google/protobuf/timestamp.proto";
-
 import "livekit_metrics.proto";
+import "logger/options.proto";
+
+option csharp_namespace = "LiveKit.Proto";
+option go_package = "github.com/livekit/protocol/livekit";
+option ruby_package = "LiveKit::Proto";
 
 message Pagination {
-  string after_id = 1; // list entities which IDs are greater
-  int32  limit = 2;
+  string after_id = 1 [(logger.name) = "afterID"]; // list entities which IDs are greater
+  int32 limit = 2;
 }
 
 message TokenPagination {
@@ -50,7 +51,10 @@ message Room {
   int64 creation_time_ms = 15;
   string turn_password = 6;
   repeated Codec enabled_codecs = 7;
-  string metadata = 8;
+  string metadata = 8 [
+    (logger.sensitivity) = SENSITIVITY_PII,
+    (logger.redact_format) = "<redacted ({{ .Size }} bytes)>"
+  ];
   uint32 num_participants = 9;
   uint32 num_publishers = 11;
   bool active_recording = 10;
@@ -114,16 +118,18 @@ message ParticipantPermission {
   bool hidden = 7;
   // indicates it's a recorder instance
   // deprecated: use ParticipantInfo.kind instead
-  bool recorder = 8 [deprecated=true];
+  bool recorder = 8 [deprecated = true];
   // indicates that participant can update own metadata and attributes
   bool can_update_metadata = 10;
   // indicates that participant is an agent
   // deprecated: use ParticipantInfo.kind instead
-  bool agent = 11 [deprecated=true];
+  bool agent = 11 [deprecated = true];
   // if a participant can subscribe to metrics
   bool can_subscribe_metrics = 12;
+  // if a participant can manage an agent session via RemoteSession (control and access state)
+  bool can_manage_agent_session = 13;
 
-  // NEXT_ID: 13
+  // NEXT_ID: 14
 }
 
 message ParticipantInfo {
@@ -150,22 +156,32 @@ message ParticipantInfo {
     AGENT = 4;
     // Connectors participants
     CONNECTOR = 7;
-    // NEXT_ID: 8
+    // Bridge participants
+    BRIDGE = 8;
+    // NEXT_ID: 9
   }
   enum KindDetail {
     CLOUD_AGENT = 0;
     FORWARDED = 1;
+    CONNECTOR_WHATSAPP = 2;
+    CONNECTOR_TWILIO = 3;
+    BRIDGE_RTSP = 4;
+    SIMULATION = 5;
+    // NEXT_ID: 6
   }
   string sid = 1;
   string identity = 2;
   State state = 3;
   repeated TrackInfo tracks = 4;
-  string metadata = 5;
+  string metadata = 5 [
+    (logger.sensitivity) = SENSITIVITY_PII,
+    (logger.redact_format) = "<redacted ({{ .Size }} bytes)>"
+  ];
   // timestamp when participant joined room, in seconds
   int64 joined_at = 6;
   // timestamp when participant joined room, in milliseconds
   int64 joined_at_ms = 17;
-  string name = 9;
+  string name = 9 [(logger.sensitivity) = SENSITIVITY_PII];
   uint32 version = 10;
   ParticipantPermission permission = 11;
   string region = 12;
@@ -173,11 +189,22 @@ message ParticipantInfo {
   // and can publish to the server
   bool is_publisher = 13;
   Kind kind = 14;
-  map<string, string> attributes = 15;
+  map<string, string> attributes = 15 [
+    (logger.sensitivity) = SENSITIVITY_PII,
+    (logger.redact_format) = "<redacted ({{ .Size }} bytes)>"
+  ];
   DisconnectReason disconnect_reason = 16;
   repeated KindDetail kind_details = 18;
+  repeated DataTrackInfo data_tracks = 19;
 
-  // NEXT_ID: 19
+  // protocol version used for client feature compatibility
+  int32 client_protocol = 20;
+
+  // capabilities the participant's client advertises, mirrored from ClientInfo.
+  // Lets other participants perform client-side feature detection.
+  repeated ClientInfo.Capability capabilities = 21;
+
+  // NEXT_ID: 22
 }
 
 enum TrackType {
@@ -196,9 +223,9 @@ enum TrackSource {
 
 message Encryption {
   enum Type {
-      NONE=0;
-      GCM=1;
-      CUSTOM=2;
+    NONE = 0;
+    GCM = 1;
+    CUSTOM = 2;
   }
 }
 
@@ -218,7 +245,7 @@ message SimulcastCodecInfo {
 message TrackInfo {
   string sid = 1;
   TrackType type = 2;
-  string name = 3;
+  string name = 3 [(logger.sensitivity) = SENSITIVITY_PII];
   bool muted = 4;
   // original width of video (unset for audio)
   // clients may receive a lower resolution version with simulcast
@@ -228,15 +255,15 @@ message TrackInfo {
   // true if track is simulcasted
   bool simulcast = 7 [deprecated = true]; // see `video_layer_mode` in `codecs`
   // true if DTX (Discontinuous Transmission) is disabled for audio
-  bool disable_dtx = 8 [deprecated=true];   // deprecated in favor of `audio_features`
+  bool disable_dtx = 8 [deprecated = true]; // deprecated in favor of `audio_features`
   // source of media
   TrackSource source = 9;
-  repeated VideoLayer layers = 10 [deprecated=true]; // see `codecs` for layers of individual codec
+  repeated VideoLayer layers = 10 [deprecated = true]; // see `codecs` for layers of individual codec
   // mime type of codec
   string mime_type = 11;
   string mid = 12;
   repeated SimulcastCodecInfo codecs = 13;
-  bool stereo = 14 [deprecated=true];   // deprecated in favor of `audio_features`
+  bool stereo = 14 [deprecated = true]; // deprecated in favor of `audio_features`
   // true if RED (Redundant Encoding) is disabled for audio
   bool disable_red = 15;
   Encryption.Type encryption = 16;
@@ -244,6 +271,142 @@ message TrackInfo {
   TimedVersion version = 18;
   repeated AudioTrackFeature audio_features = 19;
   BackupCodecPolicy backup_codec_policy = 20;
+
+  repeated PacketTrailerFeature packet_trailer_features = 21;
+}
+
+message DataTrackInfo {
+  // Client-assigned, 16-bit identifier that will be attached to packets sent by the publisher.
+  uint32 pub_handle = 1;
+
+  // Server-assigned track identifier.
+  string sid = 2;
+
+  // Human-readable identifier (e.g., `geoLocation`, `servoPosition.x`, etc.), unique per publisher.
+  string name = 3;
+
+  // Method used for end-to-end encryption (E2EE) on packet payloads.
+  Encryption.Type encryption = 4;
+
+  // Encoding for frame payloads on this track. If unspecified, the track is untyped.
+  optional DataTrackFrameEncoding frame_encoding = 5;
+
+  // ID of the schema used by frames on this track if the track is typed.
+  optional DataTrackSchemaId schema = 6;
+}
+
+// Encoding for frame payloads.
+message DataTrackFrameEncoding {
+
+    // Well-known encoding for frame payloads.
+    //
+    // Mirrors the well-known message encodings from the MCAP spec:
+    // https://mcap.dev/spec/registry#message-encodings
+    //
+    enum WellKnownFrameEncoding {
+        WELL_KNOWN_FRAME_ENCODING_UNSPECIFIED = 0;
+        // ROS 1: must be described by `ROS1_MSG` schema encoding.
+        WELL_KNOWN_FRAME_ENCODING_ROS1 = 1;
+        // CDR: must be described by `ROS2_MSG`, `ROS2_IDL`, or `OMG_IDL` schema encoding.
+        WELL_KNOWN_FRAME_ENCODING_CDR = 2;
+        // Protocol Buffer: must be described by `PROTOBUF` schema encoding.
+        WELL_KNOWN_FRAME_ENCODING_PROTOBUF = 3;
+        // FlatBuffer: must be described by `FLATBUFFER` schema encoding.
+        WELL_KNOWN_FRAME_ENCODING_FLATBUFFER = 4;
+        // CBOR: self-describing.
+        WELL_KNOWN_FRAME_ENCODING_CBOR = 5;
+        // MessagePack: self-describing.
+        WELL_KNOWN_FRAME_ENCODING_MSGPACK = 6;
+        // JSON: self-describing or described by `JSON_SCHEMA` schema encoding.
+        WELL_KNOWN_FRAME_ENCODING_JSON = 7;
+    }
+
+    oneof value {
+        WellKnownFrameEncoding well_known = 1;
+        // Identifier of a custom encoding not covered by the well-known cases.
+        // This must be non-empty and no longer than 32 characters.
+        string custom = 2;
+    }
+}
+
+// Encoding for schema definition.
+message DataTrackSchemaEncoding {
+    // Well-known encoding for schema definition.
+    //
+    // Mirrors the well-known schema encodings from the MCAP spec:
+    // https://mcap.dev/spec/registry#schema-encodings
+    //
+    enum WellKnownSchemaEncoding {
+      WELL_KNOWN_SCHEMA_ENCODING_UNSPECIFIED = 0;
+      // Protocol Buffer IDL: describes `PROTOBUF` frame encoding.
+      WELL_KNOWN_SCHEMA_ENCODING_PROTOBUF = 1;
+      // FlatBuffer IDL: describes `FLATBUFFER` frame encoding.
+      WELL_KNOWN_SCHEMA_ENCODING_FLATBUFFER = 2;
+      // ROS 1 Message: describes `ROS1` frame encoding.
+      WELL_KNOWN_SCHEMA_ENCODING_ROS1_MSG = 3;
+      // ROS 2 Message: describes `CDR` frame encoding.
+      WELL_KNOWN_SCHEMA_ENCODING_ROS2_MSG = 4;
+      // ROS 2 IDL: describes `CDR` frame encoding.
+      WELL_KNOWN_SCHEMA_ENCODING_ROS2_IDL = 5;
+      // OMG IDL: describes `CDR` frame encoding.
+      WELL_KNOWN_SCHEMA_ENCODING_OMG_IDL = 6;
+      // JSON Schema: describes `JSON` frame encoding.
+      WELL_KNOWN_SCHEMA_ENCODING_JSON_SCHEMA = 7;
+    }
+
+    oneof value {
+        WellKnownSchemaEncoding well_known = 1;
+        // Identifier of a custom encoding not covered by the well-known cases.
+        // This must be non-empty and no longer than 32 characters.
+        string custom = 2;
+    }
+}
+
+// Identifier for a data track schema.
+//
+// Schemas with the same name but different encodings are distinct.
+//
+message DataTrackSchemaId {
+  // This must be non-empty and no longer than 256 characters.
+  string name = 1;
+  DataTrackSchemaEncoding encoding = 2;
+}
+
+enum DataTrackExtensionID {
+  DTEI_INVALID = 0;
+  DTEI_PARTICIPANT_SID = 1;
+}
+
+message DataTrackExtensionParticipantSid {
+  DataTrackExtensionID id = 1;
+  string participant_sid = 2;
+}
+
+message DataTrackSubscriptionOptions {
+  // Rate in frames per second (FPS) the subscriber wants to receive frames at.
+  // If omitted, the subscriber defaults to the publisher's fps
+  optional uint32 target_fps = 1;
+}
+
+// Key used to uniquely identify a data blob for storage and retrieval.
+message DataBlobKey {
+  oneof key {
+    // Generic string key, blob contains arbitrary data.
+    string generic = 1;
+    // Data track schema identifier, blob contains schema definition.
+    DataTrackSchemaId schema_id = 2 [(logger.name) = "schemaID"];
+  }
+}
+
+// A blob of data stored in a room identified by a unique key.
+message DataBlob {
+  // Unique key the data blob is identified by.
+  DataBlobKey key = 1;
+  // Contents of the data blob. This must not exceed 50 KB.
+  bytes contents = 2 [
+    (logger.sensitivity) = SENSITIVITY_PII,
+    (logger.redact_format) = "<redacted ({{ .Size }} bytes)>"
+  ];
 }
 
 enum VideoQuality {
@@ -271,6 +434,8 @@ message VideoLayer {
   uint32 ssrc = 5;
   int32 spatial_layer = 6;
   string rid = 7;
+
+  uint32 repair_ssrc = 8;
 }
 
 // new DataPacket API
@@ -279,14 +444,14 @@ message DataPacket {
     RELIABLE = 0;
     LOSSY = 1;
   }
-  Kind kind = 1 [deprecated=true];
+  Kind kind = 1 [deprecated = true];
   // participant identity of user that sent the message
   string participant_identity = 4;
   // identities of participants who will receive the message (sent to all by default)
   repeated string destination_identities = 5;
   oneof value {
     UserPacket user = 2;
-    ActiveSpeakerUpdate speaker = 3 [deprecated=true];
+    ActiveSpeakerUpdate speaker = 3 [deprecated = true];
     SipDTMF sip_dtmf = 6;
     Transcription transcription = 7;
     MetricsBatch metrics = 8;
@@ -329,7 +494,6 @@ message EncryptedPacketPayload {
   }
 }
 
-
 message ActiveSpeakerUpdate {
   option deprecated = true;
   repeated SpeakerInfo speakers = 1;
@@ -345,14 +509,14 @@ message SpeakerInfo {
 
 message UserPacket {
   // participant ID of user that sent the message
-  string participant_sid = 1 [deprecated=true];
-  string participant_identity = 5 [deprecated=true];
+  string participant_sid = 1 [deprecated = true];
+  string participant_identity = 5 [deprecated = true];
   // user defined payload
   bytes payload = 2;
   // the ID of the participants who will receive the message (sent to all by default)
-  repeated string destination_sids = 3 [deprecated=true];
+  repeated string destination_sids = 3 [deprecated = true];
   // identities of participants who will receive the message (sent to all by default)
-  repeated string destination_identities = 6 [deprecated=true];
+  repeated string destination_identities = 6 [deprecated = true];
   // topic under which the message was published
   optional string topic = 4;
   // Unique ID to identify the message
@@ -374,7 +538,7 @@ message SipDTMF {
 message Transcription {
   // Participant that got its speech transcribed
   string transcribed_participant_identity = 2;
-  string track_id = 3;
+  string track_id = 3 [(logger.name) = "trackID"];
   repeated TranscriptionSegment segments = 4;
 
   // NEXT_ID: 6
@@ -404,17 +568,21 @@ message RpcRequest {
   string payload = 3;
   uint32 response_timeout_ms = 4;
   uint32 version = 5;
+  // Compressed payload data. When set, this field is used instead of `payload`.
+  bytes compressed_payload = 6;
 }
 
 message RpcAck {
-  string request_id = 1;
+  string request_id = 1 [(logger.name) = "requestID"];
 }
 
 message RpcResponse {
-  string request_id = 1;
+  string request_id = 1 [(logger.name) = "requestID"];
   oneof value {
     string payload = 2;
     RpcError error = 3;
+    // Compressed payload data. When set, this field is used instead of `payload`.
+    bytes compressed_payload = 4;
   }
 }
 
@@ -447,7 +615,7 @@ message ServerInfo {
   string version = 2;
   int32 protocol = 3;
   string region = 4;
-  string node_id = 5;
+  string node_id = 5 [(logger.name) = "nodeID"];
   // additional debugging information. sent only if server is in development mode
   string debug_info = 6;
   int32 agent_protocol = 7;
@@ -456,21 +624,31 @@ message ServerInfo {
 // details about the client
 message ClientInfo {
   enum SDK {
-     UNKNOWN = 0;
-     JS = 1;
-     SWIFT = 2;
-     ANDROID = 3;
-     FLUTTER = 4;
-     GO = 5;
-     UNITY = 6;
-     REACT_NATIVE = 7;
-     RUST = 8;
-     PYTHON = 9;
-     CPP = 10;
-     UNITY_WEB = 11;
-     NODE = 12;
-     UNREAL = 13;
-     ESP32 = 14;
+    UNKNOWN = 0;
+    JS = 1;
+    SWIFT = 2;
+    ANDROID = 3;
+    FLUTTER = 4;
+    GO = 5;
+    UNITY = 6;
+    REACT_NATIVE = 7;
+    RUST = 8;
+    PYTHON = 9;
+    CPP = 10;
+    UNITY_WEB = 11;
+    NODE = 12;
+    UNREAL = 13;
+    ESP32 = 14;
+  }
+
+  // Optional capabilities advertised by the client at connect time. The SFU
+  // uses these flags to decide whether to enable features that require
+  // client-side support (e.g. passing RTP packet trailers through to the
+  // subscriber instead of stripping them).
+  enum Capability {
+    CAP_UNUSED = 0;
+    CAP_PACKET_TRAILER = 1;
+    CAP_COMPRESSION_DEFLATE_RAW = 2;
   }
 
   SDK sdk = 1;
@@ -487,6 +665,11 @@ message ClientInfo {
   // comma separated list of additional LiveKit SDKs in use of this client, with versions
   // e.g. "components-js:1.2.3,track-processors-js:1.2.3"
   string other_sdks = 11;
+  // client protocol version
+  int32 client_protocol = 12;
+  // capabilities the client advertises. Populated automatically by each SDK;
+  // not a user-configurable setting.
+  repeated Capability capabilities = 13;
 }
 
 // server provided client configuration
@@ -548,6 +731,8 @@ enum DisconnectReason {
   CONNECTION_TIMEOUT = 14;
   // media stream failure or media timeout
   MEDIA_FAILURE = 15;
+  // agent encountered an error
+  AGENT_ERROR = 16;
 }
 
 message RTPDrift {
@@ -663,7 +848,7 @@ message RTPMungerState {
 }
 
 message VP8MungerState {
-  int32 ext_last_picture_id = 1;
+  int32 ext_last_picture_id = 1 [(logger.name) = "extLastPictureID"];
   bool picture_id_used = 2;
   uint32 last_tl0_pic_idx = 3;
   bool tl0_pic_idx_used = 4;
@@ -701,8 +886,13 @@ enum AudioTrackFeature {
   TF_PRECONNECT_BUFFER = 6; // client will buffer audio once available and send it to the server via bytes stream once connected
 }
 
-message DataStream {
+enum PacketTrailerFeature {
+  PTF_USER_TIMESTAMP = 0;
+  PTF_FRAME_ID = 1;
+  PTF_USER_DATA = 2;
+}
 
+message DataStream {
   // enum for operation types (specific to TextHeader)
   enum OperationType {
     CREATE = 0;
@@ -714,11 +904,10 @@ message DataStream {
   // header properties specific to text streams
   message TextHeader {
     OperationType operation_type = 1;
-    int32 version = 2;  // Optional: Version for updates/edits
-    string reply_to_stream_id = 3;  // Optional: Reply to specific message
+    int32 version = 2; // Optional: Version for updates/edits
+    string reply_to_stream_id = 3 [(logger.name) = "replyToStreamID"]; // Optional: Reply to specific message
     repeated string attached_stream_ids = 4; // file attachments for text streams
     bool generated = 5; // true if the text has been generated by an agent from a participant's audio transcription
-
   }
 
   // header properties specific to byte or file streams
@@ -726,33 +915,46 @@ message DataStream {
     string name = 1;
   }
 
+  // The compression type of the whole data stream
+  //
+  // This will only get populated when send to participants with a
+  // client protocol >= 2 which advertise a client capability of CAP_COMPRESSION_DEFLATE_RAW
+  enum CompressionType {
+    NONE = 0;
+    DEFLATE_RAW = 1; // DEFLATE_RAW = DEFLATE without header+checksum/trailer
+  }
+
   // main DataStream.Header that contains a oneof for specific headers
   message Header {
-    string stream_id = 1; // unique identifier for this data stream
-    int64 timestamp = 2;  // using int64 for Unix timestamp
+    string stream_id = 1 [(logger.name) = "streamID"]; // unique identifier for this data stream
+    int64 timestamp = 2; // using int64 for Unix timestamp
     string topic = 3;
     string mime_type = 4;
-    optional uint64 total_length = 5;  // only populated for finite streams, if it's a stream of unknown size this stays empty
-    Encryption.Type encryption_type = 7 [deprecated=true];  //  this is set on the DataPacket
-    map<string, string> attributes = 8;  // user defined attributes map that can carry additional info
+    optional uint64 total_length = 5; // only populated for finite streams, if it's a stream of unknown size this stays empty
+    Encryption.Type encryption_type = 7 [deprecated = true]; //  this is set on the DataPacket
+    map<string, string> attributes = 8; // user defined attributes map that can carry additional info
 
     // oneof to choose between specific header types
     oneof content_header {
       TextHeader text_header = 9;
       ByteHeader byte_header = 10;
     }
+
+    // Optional inline content so that a data stream can be sent as a single packet for short payloads.
+    optional bytes inline_content = 11; // content as binary (bytes)
+    CompressionType compression = 12;
   }
 
   message Chunk {
-    string stream_id = 1;  // unique identifier for this data stream to map it to the correct header
+    string stream_id = 1 [(logger.name) = "streamID"]; // unique identifier for this data stream to map it to the correct header
     uint64 chunk_index = 2;
     bytes content = 3; // content as binary (bytes)
     int32 version = 4; // a version indicating that this chunk_index has been retroactively modified and the original one needs to be replaced
-    optional bytes iv = 5 [deprecated=true]; // this is set on the DataPacket
+    optional bytes iv = 5 [deprecated = true]; // this is set on the DataPacket
   }
 
   message Trailer {
-    string stream_id = 1; // unique identifier for this data stream
+    string stream_id = 1 [(logger.name) = "streamID"]; // unique identifier for this data stream
     string reason = 2; // reason why the stream was closed (could contain "error" / "interrupted" / empty for expected end)
     map<string, string> attributes = 3; // finalizing updates for the stream, can also include additional insights for errors or endTime for transcription
   }

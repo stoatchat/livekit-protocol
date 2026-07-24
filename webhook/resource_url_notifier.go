@@ -21,17 +21,19 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"net"
+	"net/http"
 	"sync"
 	"time"
 
 	"github.com/frostbyte73/core"
 	"github.com/hashicorp/go-retryablehttp"
-	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/livekit/protocol/auth"
 	"github.com/livekit/protocol/livekit"
 	"github.com/livekit/protocol/logger"
 	"github.com/livekit/protocol/utils"
+	"github.com/livekit/protocol/utils/protojson"
 )
 
 const (
@@ -130,6 +132,18 @@ func NewResourceURLNotifier(params ResourceURLNotifierParams) *ResourceURLNotifi
 		rhc.HTTPClient.Timeout = params.ClientTimeout
 	}
 	rhc.Logger = &logAdapter{}
+	if params.ForceIPv4 {
+		var tr *http.Transport
+		if existing, ok := rhc.HTTPClient.Transport.(*http.Transport); ok && existing != nil {
+			tr = existing.Clone()
+		} else {
+			tr = http.DefaultTransport.(*http.Transport).Clone()
+		}
+		tr.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+			return (&net.Dialer{}).DialContext(ctx, "tcp4", addr)
+		}
+		rhc.HTTPClient.Transport = tr
+	}
 	r := &ResourceURLNotifier{
 		params:         params,
 		client:         rhc,

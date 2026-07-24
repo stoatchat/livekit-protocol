@@ -15,6 +15,7 @@
 syntax = "proto3";
 
 import "google/protobuf/timestamp.proto";
+import "logger/options.proto";
 
 package livekit;
 option go_package = "github.com/livekit/protocol/livekit";
@@ -27,12 +28,26 @@ enum AgentSecretKind {
     AGENT_SECRET_KIND_FILE = 2;
 }
 
+enum AgentEventType {
+    AGENT_EVENT_TYPE_UNKNOWN = 0;
+    AGENT_EVENT_TYPE_APPLICATION_CRASHED = 1;
+    AGENT_EVENT_TYPE_RESTARTED_HIGH_DISK_USAGE = 2;
+    AGENT_EVENT_TYPE_RESTARTED_HIGH_MEMORY_USAGE = 3;
+}
+
+message AgentEvent {
+    AgentEventType type = 1;
+    int32 count = 2;
+    google.protobuf.Timestamp timestamp = 3;
+}
+
 message AgentSecret {
     string name = 1;
     bytes value = 2;
     google.protobuf.Timestamp created_at = 3;
     google.protobuf.Timestamp updated_at = 4;
     AgentSecretKind kind = 5;
+    repeated string deployments = 6;
 }
 
 message CreateAgentRequest {
@@ -45,7 +60,7 @@ message CreateAgentRequest {
 }
 
 message CreateAgentResponse {
-    string agent_id = 1;
+    string agent_id = 1 [(logger.name) = "agentID"];
     string agent_name = 2;
     string status = 3;
     string version = 4;
@@ -55,6 +70,32 @@ message CreateAgentResponse {
     PresignedPostRequest presigned_post_request = 8;
 }
 
+message CreateAgentV2Request {
+  repeated AgentSecret secrets = 1;
+  repeated string regions      = 2;
+}
+
+message CreateAgentV2Response {
+  string agent_id                = 1 [(logger.name) = "agentID"];
+  string status                  = 2;
+  repeated string server_regions = 3;
+}
+
+message PromoteAgentRequest {
+  string agent_id = 1 [(logger.name) = "agentID"];
+  string src_deployment = 2;
+  string dst_deployment = 3;
+}
+
+message PromoteAgentResponse {
+  bool success = 1;
+  string message = 2;
+  string agent_id = 3 [(logger.name) = "agentID"];
+  string src_deployment = 4;
+  string dst_deployment = 5;
+  string version_tag = 6;
+}
+
 message PresignedPostRequest {
   string url = 1;
   map<string, string> values = 2;
@@ -62,7 +103,7 @@ message PresignedPostRequest {
 
 message AgentDeployment {
     string region = 1;
-    string agent_id = 2;
+    string agent_id = 2 [(logger.name) = "agentID"];
     string status = 3;
     int32 replicas = 4;
     int32 min_replicas = 5;
@@ -74,10 +115,16 @@ message AgentDeployment {
     string mem_limit = 11;
     string cpu_limit = 12;
     string server_region = 13;
+    repeated AgentEvent events = 14;
+    string deployment = 15;
+    string version = 16;
+    string agent_name = 17;
+    bool deployment_enabled = 18;
+    google.protobuf.Timestamp last_scraped_at = 19;
 }
 
 message AgentInfo {
-    string agent_id = 1;
+    string agent_id = 1 [(logger.name) = "agentID"];
     string agent_name = 2;
     string version = 3;
     repeated AgentDeployment agent_deployments = 4;
@@ -87,7 +134,7 @@ message AgentInfo {
 
 message ListAgentsRequest {
     string agent_name = 1;
-    string agent_id = 2;
+    string agent_id = 2 [(logger.name) = "agentID"];
 }
 
 message ListAgentsResponse {
@@ -101,10 +148,13 @@ message AgentVersion {
     google.protobuf.Timestamp deployed_at = 4;
     map<string, string> attributes = 5;
     string status = 6;
+    string owner = 7;
+    bool draining = 8;
+    bool active = 9;
 }
 
 message ListAgentVersionsRequest {
-    string agent_id = 1;
+    string agent_id = 1 [(logger.name) = "agentID"];
     string agent_name = 2;
 }
 
@@ -113,7 +163,7 @@ message ListAgentVersionsResponse {
 }
 
 message UpdateAgentRequest {
-    string agent_id              = 1;
+    string agent_id              = 1 [(logger.name) = "agentID"];
     string agent_name            = 2 [deprecated=true];
     int32 replicas               = 3 [deprecated=true];
     int32 max_replicas           = 4 [deprecated=true];
@@ -128,7 +178,7 @@ message UpdateAgentResponse {
 }
 
 message RestartAgentRequest {
-    string agent_id = 1;
+    string agent_id = 1 [(logger.name) = "agentID"];
 }
 
 message RestartAgentResponse {
@@ -137,28 +187,48 @@ message RestartAgentResponse {
 }
 
 message DeployAgentRequest {
-    string agent_id              = 1;
-    string agent_name            = 2 [deprecated=true];
-    repeated AgentSecret secrets = 3;
-    int32 replicas               = 4 [deprecated=true];
-    int32 max_replicas           = 5 [deprecated=true];
-    string cpu_req               = 6 [deprecated=true];
+    string agent_id                = 1 [(logger.name) = "agentID"];
+    string agent_name              = 2 [deprecated=true];
+    repeated AgentSecret secrets   = 3;
+    int32 replicas                 = 4 [deprecated=true];
+    int32 max_replicas             = 5 [deprecated=true];
+    string cpu_req                 = 6 [deprecated=true];
+    string deployment              = 7;
+    map<string, string> attributes = 8;
 }
 
 message DeployAgentResponse {
     bool success = 1;
     string message = 2;
-    string agent_id = 3;
-    string presigned_url = 4;
+    string agent_id = 3 [(logger.name) = "agentID"];
+    string presigned_url = 4 [deprecated=true];
     string tag = 5;
     PresignedPostRequest presigned_post_request = 6;
+    string deployment = 7;
+}
+
+message DeployAgentV2Request {
+  string agent_id                = 1 [(logger.name) = "agentID"];
+  repeated AgentSecret secrets   = 2;
+  string deployment              = 3;
+  map<string, string> attributes = 4;
+}
+
+message DeployAgentV2Response {
+  bool success = 1;
+  string message = 2;
+  string agent_id = 3 [(logger.name) = "agentID"];
+  string tag = 4;
+  PresignedPostRequest presigned_req = 5;
+  string deployment = 6;
 }
 
 message UpdateAgentSecretsRequest {
-    string agent_id = 1;
+    string agent_id = 1 [(logger.name) = "agentID"];
     string agent_name = 2;
     bool overwrite = 3;
     repeated AgentSecret secrets = 4;
+    repeated string remove = 5;
 }
 
 message UpdateAgentSecretsResponse {
@@ -167,7 +237,7 @@ message UpdateAgentSecretsResponse {
 }
 
 message RollbackAgentRequest {
-    string agent_id = 1;
+    string agent_id = 1 [(logger.name) = "agentID"];
     string agent_name = 2;
     string version = 3;
 }
@@ -178,8 +248,9 @@ message RollbackAgentResponse {
 }
 
 message DeleteAgentRequest {
-    string agent_id = 1;
+    string agent_id = 1 [(logger.name) = "agentID"];
     string agent_name = 2;
+    string deployment = 3; // optional
 }
 
 message DeleteAgentResponse {
@@ -188,7 +259,7 @@ message DeleteAgentResponse {
 }
 
 message ListAgentSecretsRequest {
-    string agent_id = 1;
+    string agent_id = 1 [(logger.name) = "agentID"];
     string agent_name = 2;
 }
 
@@ -208,16 +279,98 @@ message ClientSettingsResponse {
 message ClientSettingsRequest {
 }
 
+message PrivateLink {
+  message AWSConfig {
+    string endpoint = 1 [deprecated=true]; // Use the generic "endpoint" instead
+  };
+
+  string private_link_id = 1 [(logger.name) = "privateLinkID"];
+  string name = 2;
+  string region = 4;
+  uint32 port = 5;
+  string endpoint = 6;
+  string connection_endpoint = 7;
+  string cloud_region = 8;
+
+  oneof config {
+    AWSConfig aws = 3 [deprecated=true];
+  };
+}
+
+message PrivateLinkStatus {
+  enum Status {
+      PRIVATE_LINK_STATUS_UNKNOWN = 0;
+      PRIVATE_LINK_STATUS_PROVISIONING = 1;
+      PRIVATE_LINK_STATUS_PENDING_APPROVAL = 2;
+      PRIVATE_LINK_STATUS_HEALTHY = 3;
+      PRIVATE_LINK_STATUS_UNHEALTHY = 4;
+      PRIVATE_LINK_STATUS_APPROVED = 5;
+  }
+
+  Status status = 1;
+  google.protobuf.Timestamp updated_at = 2;
+  string reason = 3;
+}
+
+message CreatePrivateLinkRequest {
+  message AWSCreateConfig {
+    string endpoint = 1 [deprecated=true];
+  }
+
+  string name = 1;
+  string region = 3;
+  uint32 port = 4;
+  string endpoint = 5;
+  optional string cloud_region = 6;
+  oneof config {
+    AWSCreateConfig aws = 2 [deprecated=true];
+  }
+}
+
+message CreatePrivateLinkResponse {
+  PrivateLink private_link = 1;
+}
+
+message DestroyPrivateLinkRequest {
+  string private_link_id = 1 [(logger.name) = "privateLinkID"];
+}
+
+message DestroyPrivateLinkResponse {
+}
+
+message ListPrivateLinksRequest {
+}
+
+message ListPrivateLinksResponse {
+  repeated PrivateLink items = 1;
+}
+
+message GetPrivateLinkStatusRequest {
+  string private_link_id = 1 [(logger.name) = "privateLinkID"];
+}
+
+message GetPrivateLinkStatusResponse {
+  PrivateLinkStatus value = 1;
+}
+
 service CloudAgent {
     rpc CreateAgent(CreateAgentRequest) returns (CreateAgentResponse) {}
+    rpc CreateAgentV2(CreateAgentV2Request) returns (CreateAgentV2Response) {}
+    rpc PromoteAgent(PromoteAgentRequest) returns (PromoteAgentResponse) {}
     rpc ListAgents(ListAgentsRequest) returns (ListAgentsResponse) {}
     rpc ListAgentVersions(ListAgentVersionsRequest) returns (ListAgentVersionsResponse) {}
     rpc ListAgentSecrets(ListAgentSecretsRequest) returns (ListAgentSecretsResponse) {}
     rpc UpdateAgent(UpdateAgentRequest) returns (UpdateAgentResponse) {}
     rpc RestartAgent(RestartAgentRequest) returns (RestartAgentResponse) {}
     rpc DeployAgent(DeployAgentRequest) returns (DeployAgentResponse) {}
+    rpc DeployAgentV2(DeployAgentV2Request) returns (DeployAgentV2Response) {}
     rpc UpdateAgentSecrets(UpdateAgentSecretsRequest) returns (UpdateAgentSecretsResponse) {}
     rpc RollbackAgent(RollbackAgentRequest) returns (RollbackAgentResponse) {}
     rpc DeleteAgent(DeleteAgentRequest) returns (DeleteAgentResponse) {}
     rpc GetClientSettings(ClientSettingsRequest) returns (ClientSettingsResponse) {}
+
+    rpc CreatePrivateLink(CreatePrivateLinkRequest) returns (CreatePrivateLinkResponse) {}
+    rpc DestroyPrivateLink(DestroyPrivateLinkRequest) returns (DestroyPrivateLinkResponse) {}
+    rpc ListPrivateLinks(ListPrivateLinksRequest) returns (ListPrivateLinksResponse) {}
+    rpc GetPrivateLinkStatus(GetPrivateLinkStatusRequest) returns (GetPrivateLinkStatusResponse) {}
 }

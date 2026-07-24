@@ -7,12 +7,21 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
+	"golang.org/x/text/language"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 
+	"github.com/livekit/protocol/logger"
 	"github.com/livekit/protocol/utils/xtwirp"
+	"github.com/livekit/psrpc"
 )
+
+// MaxSIPMediaTimeout is the maximum allowed trunk / API value for media_timeout
+// (no incoming RTP before the RTP path is torn down)
+const MaxSIPMediaTimeout = 10 * time.Minute
 
 var (
 	_ xtwirp.ErrorMeta = (*SIPStatus)(nil)
@@ -44,38 +53,102 @@ func (p *SIPStatus) Error() string {
 	return fmt.Sprintf("sip status: %d (%s)", p.Code, p.Code.ShortName())
 }
 
+// Maps SIP response codes received from remote SIP servers to GRPC error codes.
+var sipCodeToGRPCCode = map[SIPStatusCode]codes.Code{
+	// 3xx - Redirection Responses
+	SIPStatusCode_SIP_STATUS_MULTIPLE_CHOICES:    codes.InvalidArgument,
+	SIPStatusCode_SIP_STATUS_MOVED_PERMANENTLY:   codes.NotFound,
+	SIPStatusCode_SIP_STATUS_MOVED_TEMPORARILY:   codes.NotFound,
+	SIPStatusCode_SIP_STATUS_USE_PROXY:           codes.InvalidArgument,
+	SIPStatusCode_SIP_STATUS_ALTERNATIVE_SERVICE: codes.InvalidArgument,
+
+	// 4xx - Client Failure Responses
+	SIPStatusCode_SIP_STATUS_BAD_REQUEST:                      codes.InvalidArgument,
+	SIPStatusCode_SIP_STATUS_UNAUTHORIZED:                     codes.PermissionDenied,
+	SIPStatusCode_SIP_STATUS_PAYMENT_REQUIRED:                 codes.PermissionDenied,
+	SIPStatusCode_SIP_STATUS_FORBIDDEN:                        codes.PermissionDenied,
+	SIPStatusCode_SIP_STATUS_NOTFOUND:                         codes.NotFound,
+	SIPStatusCode_SIP_STATUS_METHOD_NOT_ALLOWED:               codes.InvalidArgument,
+	SIPStatusCode_SIP_STATUS_NOT_ACCEPTABLE:                   codes.InvalidArgument,
+	SIPStatusCode_SIP_STATUS_PROXY_AUTH_REQUIRED:              codes.Unauthenticated,
+	SIPStatusCode_SIP_STATUS_REQUEST_TIMEOUT:                  codes.DeadlineExceeded,
+	SIPStatusCode_SIP_STATUS_CONFLICT:                         codes.FailedPrecondition,
+	SIPStatusCode_SIP_STATUS_GONE:                             codes.NotFound,
+	SIPStatusCode_SIP_STATUS_LENGTH_REQUIRED:                  codes.InvalidArgument,
+	SIPStatusCode_SIP_STATUS_CONDITIONAL_REQUEST_FAILED:       codes.FailedPrecondition,
+	SIPStatusCode_SIP_STATUS_REQUEST_ENTITY_TOO_LARGE:         codes.InvalidArgument,
+	SIPStatusCode_SIP_STATUS_REQUEST_URI_TOO_LONG:             codes.InvalidArgument,
+	SIPStatusCode_SIP_STATUS_UNSUPPORTED_MEDIA_TYPE:           codes.InvalidArgument,
+	SIPStatusCode_SIP_STATUS_REQUESTED_RANGE_NOT_SATISFIABLE:  codes.OutOfRange,
+	SIPStatusCode_SIP_STATUS_UNKNOWN_RESOURCE_PRIORITY:        codes.InvalidArgument,
+	SIPStatusCode_SIP_STATUS_BAD_EXTENSION:                    codes.InvalidArgument,
+	SIPStatusCode_SIP_STATUS_EXTENSION_REQUIRED:               codes.InvalidArgument,
+	SIPStatusCode_SIP_STATUS_SESSION_INTERVAL_TOO_SMALL:       codes.InvalidArgument,
+	SIPStatusCode_SIP_STATUS_INTERVAL_TOO_BRIEF:               codes.InvalidArgument,
+	SIPStatusCode_SIP_STATUS_BAD_LOCATION_INFORMATION:         codes.InvalidArgument,
+	SIPStatusCode_SIP_STATUS_BAD_ALERT_MESSAGE:                codes.InvalidArgument,
+	SIPStatusCode_SIP_STATUS_USE_IDENTITY_HEADER:              codes.Unauthenticated,
+	SIPStatusCode_SIP_STATUS_PROVIDE_REFERRER_IDENTITY:        codes.InvalidArgument,
+	SIPStatusCode_SIP_STATUS_FLOW_FAILED:                      codes.InvalidArgument,
+	SIPStatusCode_SIP_STATUS_ANONYMITY_DISALLOWED:             codes.PermissionDenied,
+	SIPStatusCode_SIP_STATUS_BAD_IDENTITY_INFO:                codes.Unauthenticated,
+	SIPStatusCode_SIP_STATUS_UNSUPPORTED_CERTIFICATE:          codes.Unauthenticated,
+	SIPStatusCode_SIP_STATUS_INVALID_IDENTITY_HEADER:          codes.Unauthenticated,
+	SIPStatusCode_SIP_STATUS_FIRST_HOP_LACKS_OUTBOUND_SUPPORT: codes.InvalidArgument,
+	SIPStatusCode_SIP_STATUS_MAX_BREADTH_EXCEEDED:             codes.ResourceExhausted,
+	SIPStatusCode_SIP_STATUS_BAD_INFO_PACKAGE:                 codes.InvalidArgument,
+	SIPStatusCode_SIP_STATUS_CONSENT_NEEDED:                   codes.PermissionDenied,
+	SIPStatusCode_SIP_STATUS_TEMPORARILY_UNAVAILABLE:          codes.ResourceExhausted,
+	SIPStatusCode_SIP_STATUS_CALL_TRANSACTION_DOES_NOT_EXISTS: codes.NotFound,
+	SIPStatusCode_SIP_STATUS_LOOP_DETECTED:                    codes.FailedPrecondition,
+	SIPStatusCode_SIP_STATUS_TOO_MANY_HOPS:                    codes.FailedPrecondition,
+	SIPStatusCode_SIP_STATUS_ADDRESS_INCOMPLETE:               codes.InvalidArgument,
+	SIPStatusCode_SIP_STATUS_AMBIGUOUS:                        codes.InvalidArgument,
+	SIPStatusCode_SIP_STATUS_BUSY_HERE:                        codes.ResourceExhausted,
+	SIPStatusCode_SIP_STATUS_REQUEST_TERMINATED:               codes.Aborted,
+	SIPStatusCode_SIP_STATUS_NOT_ACCEPTABLE_HERE:              codes.InvalidArgument,
+	SIPStatusCode_SIP_STATUS_BAD_EVENT:                        codes.InvalidArgument,
+	SIPStatusCode_SIP_STATUS_REQUEST_PENDING:                  codes.Aborted,
+	SIPStatusCode_SIP_STATUS_UNDECIPHERABLE:                   codes.InvalidArgument,
+	SIPStatusCode_SIP_STATUS_SECURITY_AGREEMENT_REQUIRED:      codes.Unauthenticated,
+
+	// 5xx - Server Failure Responses
+	SIPStatusCode_SIP_STATUS_INTERNAL_SERVER_ERROR: codes.FailedPrecondition,
+	SIPStatusCode_SIP_STATUS_NOT_IMPLEMENTED:       codes.FailedPrecondition,
+	SIPStatusCode_SIP_STATUS_BAD_GATEWAY:           codes.FailedPrecondition,
+	SIPStatusCode_SIP_STATUS_SERVICE_UNAVAILABLE:   codes.FailedPrecondition,
+	SIPStatusCode_SIP_STATUS_GATEWAY_TIMEOUT:       codes.DeadlineExceeded,
+	SIPStatusCode_SIP_STATUS_VERSION_NOT_SUPPORTED: codes.InvalidArgument,
+	SIPStatusCode_SIP_STATUS_MESSAGE_TOO_LARGE:     codes.InvalidArgument,
+
+	// 6xx - Global Failure Responses
+	SIPStatusCode_SIP_STATUS_GLOBAL_BUSY_EVERYWHERE:         codes.ResourceExhausted,
+	SIPStatusCode_SIP_STATUS_GLOBAL_DECLINE:                 codes.PermissionDenied,
+	SIPStatusCode_SIP_STATUS_GLOBAL_DOES_NOT_EXIST_ANYWHERE: codes.NotFound,
+	SIPStatusCode_SIP_STATUS_GLOBAL_NOT_ACCEPTABLE:          codes.InvalidArgument,
+	SIPStatusCode_SIP_STATUS_GLOBAL_UNWANTED:                codes.PermissionDenied,
+	SIPStatusCode_SIP_STATUS_GLOBAL_REJECTED:                codes.PermissionDenied,
+}
+
 func (p *SIPStatus) GRPCStatus() *status.Status {
+	code, ok := sipCodeToGRPCCode[p.Code]
+	if !ok {
+		code = codes.Unknown // 1xx and 2xx codes should never emit an error, something is wrong.
+		if p.Code < 200 {
+			code = codes.Unknown // 1xx are not final responses, something is wrong.
+		} else if p.Code < 300 {
+			return status.New(codes.OK, "OK") // Preserving previous behavior
+		} else if p.Code < 500 {
+			code = codes.InvalidArgument
+		} else if p.Code < 600 {
+			code = codes.FailedPrecondition // 5xx from remote server, per guideline (c) in gRPC docs
+		} else if p.Code < 700 {
+			code = codes.InvalidArgument // Same as 4xx ,but authoritative
+		}
+	}
 	msg := p.Status
 	if msg == "" {
 		msg = p.Code.ShortName()
-	}
-	var code = codes.Internal
-	switch p.Code {
-	case SIPStatusCode_SIP_STATUS_OK:
-		return status.New(codes.OK, "OK")
-	case SIPStatusCode_SIP_STATUS_REQUEST_TERMINATED:
-		code = codes.Aborted
-	case SIPStatusCode_SIP_STATUS_BAD_REQUEST,
-		SIPStatusCode_SIP_STATUS_NOTFOUND,
-		SIPStatusCode_SIP_STATUS_ADDRESS_INCOMPLETE,
-		SIPStatusCode_SIP_STATUS_AMBIGUOUS,
-		SIPStatusCode_SIP_STATUS_BAD_EXTENSION,
-		SIPStatusCode_SIP_STATUS_EXTENSION_REQUIRED:
-		code = codes.InvalidArgument
-	case SIPStatusCode_SIP_STATUS_REQUEST_TIMEOUT,
-		SIPStatusCode_SIP_STATUS_GATEWAY_TIMEOUT:
-		code = codes.DeadlineExceeded
-	case SIPStatusCode_SIP_STATUS_SERVICE_UNAVAILABLE,
-		SIPStatusCode_SIP_STATUS_TEMPORARILY_UNAVAILABLE,
-		SIPStatusCode_SIP_STATUS_BUSY_HERE,
-		SIPStatusCode_SIP_STATUS_GLOBAL_BUSY_EVERYWHERE,
-		SIPStatusCode_SIP_STATUS_NOT_IMPLEMENTED,
-		SIPStatusCode_SIP_STATUS_GLOBAL_DECLINE:
-		code = codes.Unavailable
-	case SIPStatusCode_SIP_STATUS_PROXY_AUTH_REQUIRED,
-		SIPStatusCode_SIP_STATUS_UNAUTHORIZED,
-		SIPStatusCode_SIP_STATUS_FORBIDDEN:
-		code = codes.PermissionDenied
 	}
 	st := status.New(code, fmt.Sprintf("sip status %d: %s", p.Code, msg))
 	if st2, err := st.WithDetails(p); err == nil {
@@ -235,29 +308,106 @@ func (p *SIPOutboundTrunkInfo) AsTrunkInfo() *SIPTrunkInfo {
 	}
 }
 
-var reHeaders = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9\-_]*$`)
-
-func validateHeader(header string) error {
-	if !reHeaders.MatchString(header) {
-		return fmt.Errorf("invalid header name: %q", header)
-	}
-	return nil
+// ValidationResult holds information about something that's been validated.
+type ValidationResult struct {
+	err      error
+	softErrs []error
 }
 
-func validateHeaderKeys(headers map[string]string) error {
-	for k := range headers {
-		if err := validateHeader(k); err != nil {
-			return err
+// OK returns whether or not an error was seen.
+func (vr ValidationResult) OK() bool {
+	return vr.err == nil
+}
+
+// Error returns the error associated with the result.
+func (vr ValidationResult) Error() error {
+	return vr.err
+}
+
+// SoftErrors returns errors that can probably be ignored.
+func (vr ValidationResult) SoftErrors() []error {
+	return vr.softErrs
+}
+
+// Combine returns a new validation result that is comprised of this result and
+// the other result.
+func (vr ValidationResult) Combine(other ValidationResult) ValidationResult {
+	err := errors.Join(vr.err, other.err)
+	softErrs := append(vr.softErrs, other.softErrs...)
+	return ValidationResult{err, softErrs}
+}
+
+// WithError returns a new ValidationResult with the given error.
+func (vr ValidationResult) WithError(err error) ValidationResult {
+	return ValidationResult{err, vr.softErrs}
+}
+
+// LogSoftErrors logs warnings for each of the result's soft errors and
+// returns the result's associated error, if any.
+func (vr ValidationResult) LogSoftErrors(l logger.Logger) error {
+	for _, err := range vr.softErrs {
+		l.Warnw("soft validation failure: %w", err)
+	}
+	return vr.err
+}
+
+// LogUnlikelySoftErrors is a variant of LogSoftErrors.
+func (vr ValidationResult) LogUnlikelySoftErrors(l logger.UnlikelyLogger) error {
+	for _, err := range vr.softErrs {
+		l.Warnw("soft validation failure: %w", err)
+	}
+	return vr.err
+}
+
+// ValidationFailure returns a new ValidationResult.
+func ValidationFailure(err error) ValidationResult {
+	return ValidationResult{err, nil}
+}
+
+func validateHeaders(headers map[string]string) ValidationResult {
+	ret := ValidationResult{}
+	for headerName, headerValue := range headers {
+		if err := ValidateHeaderName(headerName, true); err != nil {
+			return ret.WithError(fmt.Errorf("invalid header name: %w", err))
+		}
+		result := ValidateHeaderValueResult(headerName, headerValue)
+		if !result.OK() {
+			return ret.WithError(fmt.Errorf("invalid header value for %s: %w", headerName, result.Error()))
+		}
+		ret = ret.Combine(result)
+	}
+	return ret
+}
+
+// validateHeaderNames Makes sure the values of the given map correspond to valid SIP header names
+func validateAttributesToHeaders(attributesToHeaders map[string]string) error {
+	for _, headerName := range attributesToHeaders {
+		if err := ValidateHeaderName(headerName, false); err != nil {
+			return fmt.Errorf("invalid header name: %w", err)
 		}
 	}
 	return nil
 }
 
-func validateHeaderValues(headers map[string]string) error {
-	for _, v := range headers {
-		if err := validateHeader(v); err != nil {
-			return err
+// validateHeaderToAttributes Makes sure the keys of the given map correspond to valid SIP header names
+func validateHeaderToAttributes(headerToAttributes map[string]string) error {
+	for headerName := range headerToAttributes {
+		if err := ValidateHeaderName(headerName, false); err != nil {
+			return fmt.Errorf("invalid header name: %w", err)
 		}
+	}
+	return nil
+}
+
+// validateHostnameFormat ensures value is a hostname or IP, not a SIP URI or containing transport parameter.
+// Returns nil if value is empty (for optional fields).
+// fieldName is used to construct error messages, e.g. "from_host" or "trunk hostname".
+func validateHostnameFormat(value, fieldName string) error {
+	if strings.Contains(value, "transport=") {
+		return errors.New(fieldName + " should not contain transport parameter")
+	}
+	if strings.ContainsAny(value, "@;") || strings.HasPrefix(value, "sip:") || strings.HasPrefix(value, "sips:") {
+		return errors.New(fieldName + " should be a hostname or IP, not SIP URI")
 	}
 	return nil
 }
@@ -270,104 +420,124 @@ func (p *SIPTrunkInfo) Validate() error {
 }
 
 func (p *CreateSIPOutboundTrunkRequest) Validate() error {
+	return p.ValidateResult().Error()
+}
+
+func (p *CreateSIPOutboundTrunkRequest) ValidateResult() ValidationResult {
 	if p.Trunk == nil {
-		return errors.New("missing trunk")
+		return ValidationFailure(errors.New("missing trunk"))
 	}
 	if p.Trunk.SipTrunkId != "" {
-		return errors.New("trunk id must not be set")
+		return ValidationFailure(errors.New("trunk id must not be set"))
 	}
-	if err := p.Trunk.Validate(); err != nil {
-		return err
-	}
-	return nil
+	return p.Trunk.ValidateResult()
 }
 
 func (p *CreateSIPInboundTrunkRequest) Validate() error {
+	return p.ValidateResult().Error()
+}
+
+func (p *CreateSIPInboundTrunkRequest) ValidateResult() ValidationResult {
 	if p.Trunk == nil {
-		return errors.New("missing trunk")
+		return ValidationFailure(errors.New("missing trunk"))
 	}
 	if p.Trunk.SipTrunkId != "" {
-		return errors.New("trunk id must not be set")
+		return ValidationFailure(errors.New("trunk id must not be set"))
 	}
-	if err := p.Trunk.Validate(); err != nil {
-		return err
-	}
-	return nil
+	return p.Trunk.ValidateResult()
 }
 
 func (p *UpdateSIPOutboundTrunkRequest) Validate() error {
+	return p.ValidateResult().Error()
+}
+
+func (p *UpdateSIPOutboundTrunkRequest) ValidateResult() ValidationResult {
 	if p.SipTrunkId == "" {
-		return errors.New("trunk id must be set")
+		return ValidationFailure(errors.New("trunk id must be set"))
 	}
 	if p.Action == nil {
-		return errors.New("missing or unsupported update action")
+		return ValidationFailure(errors.New("missing or unsupported update action"))
 	}
 	switch a := p.Action.(type) {
 	default:
-		return nil
+		return ValidationResult{}
 	case *UpdateSIPOutboundTrunkRequest_Replace:
 		info := a.Replace
 		if info == nil {
-			return errors.New("missing trunk")
+			return ValidationFailure(errors.New("missing trunk"))
 		}
 		if info.SipTrunkId != "" && info.SipTrunkId != p.SipTrunkId {
-			return errors.New("trunk id in the info must be empty or match the id in the update")
+			return ValidationFailure(errors.New("trunk id in the info must be empty or match the id in the update"))
 		}
-		return info.Validate()
+		return info.ValidateResult()
 	case *UpdateSIPOutboundTrunkRequest_Update:
 		diff := a.Update
 		if diff == nil {
-			return errors.New("missing trunk update")
+			return ValidationFailure(errors.New("missing trunk update"))
 		}
-		return diff.Validate()
+		return ValidationResult{diff.Validate(), nil}
 	}
 }
 
 func (p *UpdateSIPInboundTrunkRequest) Validate() error {
+	return p.ValidateResult().Error()
+}
+
+func (p *UpdateSIPInboundTrunkRequest) ValidateResult() ValidationResult {
 	if p.SipTrunkId == "" {
-		return errors.New("trunk id must be set")
+		return ValidationFailure(errors.New("trunk id must be set"))
 	}
 	if p.Action == nil {
-		return errors.New("missing or unsupported update action")
+		return ValidationFailure(errors.New("missing or unsupported update action"))
 	}
 	switch a := p.Action.(type) {
 	default:
-		return nil
+		return ValidationResult{}
 	case *UpdateSIPInboundTrunkRequest_Replace:
 		info := a.Replace
 		if info == nil {
-			return errors.New("missing trunk")
+			return ValidationFailure(errors.New("missing trunk"))
 		}
 		if info.SipTrunkId != "" && info.SipTrunkId != p.SipTrunkId {
-			return errors.New("trunk id in the info must be empty or match the id in the update")
+			return ValidationFailure(errors.New("trunk id in the info must be empty or match the id in the update"))
 		}
-		return info.Validate()
+		return info.ValidateResult()
 	case *UpdateSIPInboundTrunkRequest_Update:
 		diff := a.Update
 		if diff == nil {
-			return errors.New("missing trunk update")
+			return ValidationFailure(errors.New("missing trunk update"))
 		}
-		return diff.Validate()
+		return ValidationResult{diff.Validate(), nil}
 	}
 }
 
 func (p *SIPInboundTrunkInfo) Validate() error {
+	return p.ValidateResult().Error()
+}
+
+func (p *SIPInboundTrunkInfo) ValidateResult() ValidationResult {
 	hasAuth := p.AuthUsername != "" || p.AuthPassword != ""
 	hasCIDR := len(p.AllowedAddresses) != 0
 	hasNumbers := len(p.Numbers) != 0 // TODO: remove this condition, it doesn't really help with security
 	if !hasAuth && !hasCIDR && !hasNumbers {
-		return errors.New("for security, one of the fields must be set: AuthUsername+AuthPassword, AllowedAddresses or Numbers")
+		return ValidationFailure(psrpc.NewErrorf(psrpc.InvalidArgument, "for security, one of the fields must be set: AuthUsername+AuthPassword, AllowedAddresses or Numbers"))
 	}
-	if err := validateHeaderKeys(p.Headers); err != nil {
-		return err
+	if err := p.Media.Validate(); err != nil {
+		return ValidationFailure(err)
 	}
-	if err := validateHeaderKeys(p.HeadersToAttributes); err != nil {
-		return err
+
+	result := validateHeaders(p.Headers)
+	if !result.OK() {
+		return result
 	}
-	if err := validateHeaderValues(p.AttributesToHeaders); err != nil {
-		return err
+
+	if err := validateAttributesToHeaders(p.AttributesToHeaders); err != nil {
+		return result.WithError(err)
 	}
-	return nil
+	if err := validateHeaderToAttributes(p.HeadersToAttributes); err != nil {
+		return result.WithError(err)
+	}
+	return result
 }
 
 func (p *SIPInboundTrunkUpdate) Validate() error {
@@ -380,27 +550,37 @@ func (p *SIPInboundTrunkUpdate) Validate() error {
 	if err := p.AllowedNumbers.Validate(); err != nil {
 		return err
 	}
+	if err := p.Media.Validate(); err != nil {
+		return err
+	}
 	return nil
 }
 
 func (p *SIPInboundTrunkUpdate) Apply(info *SIPInboundTrunkInfo) error {
+	return p.ApplyResult(info).Error()
+}
+
+func (p *SIPInboundTrunkUpdate) ApplyResult(info *SIPInboundTrunkInfo) ValidationResult {
 	if err := p.Validate(); err != nil {
-		return err
+		return ValidationFailure(err)
 	}
 	applyListUpdate(&info.Numbers, p.Numbers)
 	applyListUpdate(&info.AllowedAddresses, p.AllowedAddresses)
 	applyListUpdate(&info.AllowedNumbers, p.AllowedNumbers)
 	applyUpdate(&info.AuthUsername, p.AuthUsername)
 	applyUpdate(&info.AuthPassword, p.AuthPassword)
+	applyUpdate(&info.AuthRealm, p.AuthRealm)
 	applyUpdate(&info.Name, p.Name)
 	applyUpdate(&info.Metadata, p.Metadata)
-	applyUpdate(&info.MediaEncryption, p.MediaEncryption)
-	return info.Validate()
+	updateMediaConfig(info, &info.Media, &info.MediaEncryption, p.Media, p.MediaEncryption)
+	info.Upgrade()
+	return info.ValidateResult()
 }
 
 type UpdateSIPOutboundTrunkRequestAction interface {
 	isUpdateSIPOutboundTrunkRequest_Action
 	Apply(info *SIPOutboundTrunkInfo) (*SIPOutboundTrunkInfo, error)
+	ApplyResult(info *SIPOutboundTrunkInfo) (*SIPOutboundTrunkInfo, ValidationResult)
 }
 
 var (
@@ -409,66 +589,98 @@ var (
 )
 
 func (p *UpdateSIPOutboundTrunkRequest_Replace) Apply(info *SIPOutboundTrunkInfo) (*SIPOutboundTrunkInfo, error) {
-	val := cloneProto(p.Replace)
+	val, result := p.ApplyResult(info)
+	if !result.OK() {
+		return nil, result.Error()
+	}
+	return val, nil
+}
+
+func (p *UpdateSIPOutboundTrunkRequest_Replace) ApplyResult(info *SIPOutboundTrunkInfo) (*SIPOutboundTrunkInfo, ValidationResult) {
+	val := proto.CloneOf(p.Replace)
 	if val == nil {
-		return nil, errors.New("missing trunk")
+		return nil, ValidationFailure(errors.New("missing trunk"))
 	}
 	if info.SipTrunkId != "" {
 		val.SipTrunkId = info.SipTrunkId
 	}
-	if err := val.Validate(); err != nil {
-		return nil, err
+	result := val.ValidateResult()
+	if !result.OK() {
+		return nil, result
 	}
-	return val, nil
+	return val, result
 }
 
 func (p *UpdateSIPOutboundTrunkRequest_Update) Apply(info *SIPOutboundTrunkInfo) (*SIPOutboundTrunkInfo, error) {
-	diff := p.Update
-	if diff == nil {
-		return nil, errors.New("missing trunk update")
-	}
-	val := cloneProto(info)
-	if err := diff.Apply(val); err != nil {
-		return nil, err
+	val, result := p.ApplyResult(info)
+	if !result.OK() {
+		return nil, result.Error()
 	}
 	return val, nil
 }
 
+func (p *UpdateSIPOutboundTrunkRequest_Update) ApplyResult(info *SIPOutboundTrunkInfo) (*SIPOutboundTrunkInfo, ValidationResult) {
+	diff := p.Update
+	if diff == nil {
+		return nil, ValidationFailure(errors.New("missing trunk update"))
+	}
+	val := proto.CloneOf(info)
+	result := diff.ApplyResult(val)
+	if !result.OK() {
+		return nil, result
+	}
+	return val, ValidationResult{}
+}
+
 func (p *SIPOutboundTrunkInfo) Validate() error {
+	return p.ValidateResult().Error()
+}
+
+func (p *SIPOutboundTrunkInfo) ValidateResult() ValidationResult {
 	if len(p.Numbers) == 0 {
-		return errors.New("no trunk numbers specified")
+		return ValidationFailure(errors.New("no trunk numbers specified"))
 	}
 	if p.Address == "" {
-		return errors.New("no outbound address specified")
-	} else if strings.Contains(p.Address, "transport=") {
-		return errors.New("trunk transport should be set as a field, not a URI parameter")
-	} else if strings.ContainsAny(p.Address, "@;") || strings.HasPrefix(p.Address, "sip:") || strings.HasPrefix(p.Address, "sips:") {
-		return errors.New("trunk address should be a hostname or IP, not SIP URI")
+		return ValidationFailure(errors.New("no outbound address specified"))
 	}
-	if err := validateHeaderKeys(p.Headers); err != nil {
-		return err
+	if err := validateHostnameFormat(p.Address, "trunk address"); err != nil {
+		return ValidationFailure(err)
 	}
-	if err := validateHeaderKeys(p.HeadersToAttributes); err != nil {
-		return err
+	if err := validateHostnameFormat(p.FromHost, "from_host"); err != nil {
+		return ValidationFailure(err)
 	}
-	if err := validateHeaderValues(p.AttributesToHeaders); err != nil {
-		return err
+
+	result := validateHeaders(p.Headers)
+	if !result.OK() {
+		return result
 	}
-	return nil
+
+	if err := validateAttributesToHeaders(p.AttributesToHeaders); err != nil {
+		return result.WithError(err)
+	}
+	if err := validateHeaderToAttributes(p.HeadersToAttributes); err != nil {
+		return result.WithError(err)
+	}
+	if err := p.Media.Validate(); err != nil {
+		return result.WithError(err)
+	}
+	return result
 }
 
 func (p *SIPOutboundConfig) Validate() error {
 	if p.Hostname == "" {
 		return errors.New("no outbound hostname specified")
-	} else if strings.Contains(p.Hostname, "transport=") {
-		return errors.New("trunk transport should be set as a field, not a URI parameter")
-	} else if strings.ContainsAny(p.Hostname, "@;") || strings.HasPrefix(p.Hostname, "sip:") || strings.HasPrefix(p.Hostname, "sips:") {
-		return errors.New("trunk hostname should be a domain name or IP, not SIP URI")
 	}
-	if err := validateHeaderKeys(p.HeadersToAttributes); err != nil {
+	if err := validateHostnameFormat(p.Hostname, "trunk hostname"); err != nil {
 		return err
 	}
-	if err := validateHeaderValues(p.AttributesToHeaders); err != nil {
+	if err := validateHostnameFormat(p.FromHost, "from_host"); err != nil {
+		return err
+	}
+	if err := validateAttributesToHeaders(p.AttributesToHeaders); err != nil {
+		return err
+	}
+	if err := validateHeaderToAttributes(p.HeadersToAttributes); err != nil {
 		return err
 	}
 	return nil
@@ -478,12 +690,19 @@ func (p *SIPOutboundTrunkUpdate) Validate() error {
 	if err := p.Numbers.Validate(); err != nil {
 		return err
 	}
+	if err := p.Media.Validate(); err != nil {
+		return err
+	}
 	return nil
 }
 
 func (p *SIPOutboundTrunkUpdate) Apply(info *SIPOutboundTrunkInfo) error {
+	return p.ApplyResult(info).Error()
+}
+
+func (p *SIPOutboundTrunkUpdate) ApplyResult(info *SIPOutboundTrunkInfo) ValidationResult {
 	if err := p.Validate(); err != nil {
-		return err
+		return ValidationFailure(err)
 	}
 	applyUpdate(&info.Address, p.Address)
 	applyUpdate(&info.Transport, p.Transport)
@@ -493,13 +712,16 @@ func (p *SIPOutboundTrunkUpdate) Apply(info *SIPOutboundTrunkInfo) error {
 	applyUpdate(&info.AuthPassword, p.AuthPassword)
 	applyUpdate(&info.Name, p.Name)
 	applyUpdate(&info.Metadata, p.Metadata)
-	applyUpdate(&info.MediaEncryption, p.MediaEncryption)
-	return info.Validate()
+	applyUpdate(&info.FromHost, p.FromHost)
+	updateMediaConfig(info, &info.Media, &info.MediaEncryption, p.Media, p.MediaEncryption)
+	info.Upgrade()
+	return info.ValidateResult()
 }
 
 type UpdateSIPInboundTrunkRequestAction interface {
 	isUpdateSIPInboundTrunkRequest_Action
 	Apply(info *SIPInboundTrunkInfo) (*SIPInboundTrunkInfo, error)
+	ApplyResult(info *SIPInboundTrunkInfo) (*SIPInboundTrunkInfo, ValidationResult)
 }
 
 var (
@@ -508,29 +730,45 @@ var (
 )
 
 func (p *UpdateSIPInboundTrunkRequest_Replace) Apply(info *SIPInboundTrunkInfo) (*SIPInboundTrunkInfo, error) {
-	val := cloneProto(p.Replace)
-	if val == nil {
-		return nil, errors.New("missing trunk")
-	}
-	if info.SipTrunkId != "" {
-		val.SipTrunkId = info.SipTrunkId
-	}
-	if err := val.Validate(); err != nil {
-		return nil, err
+	val, result := p.ApplyResult(info)
+	if !result.OK() {
+		return nil, result.Error()
 	}
 	return val, nil
 }
 
-func (p *UpdateSIPInboundTrunkRequest_Update) Apply(info *SIPInboundTrunkInfo) (*SIPInboundTrunkInfo, error) {
-	diff := p.Update
-	if diff == nil {
-		return nil, errors.New("missing trunk update")
+func (p *UpdateSIPInboundTrunkRequest_Replace) ApplyResult(info *SIPInboundTrunkInfo) (*SIPInboundTrunkInfo, ValidationResult) {
+	val := proto.CloneOf(p.Replace)
+	if val == nil {
+		return nil, ValidationFailure(errors.New("missing trunk"))
 	}
-	val := cloneProto(info)
-	if err := diff.Apply(val); err != nil {
-		return nil, err
+	if info.SipTrunkId != "" {
+		val.SipTrunkId = info.SipTrunkId
+	}
+	if result := val.ValidateResult(); !result.OK() {
+		return nil, result
+	}
+	return val, ValidationResult{}
+}
+
+func (p *UpdateSIPInboundTrunkRequest_Update) Apply(info *SIPInboundTrunkInfo) (*SIPInboundTrunkInfo, error) {
+	val, result := p.ApplyResult(info)
+	if !result.OK() {
+		return nil, result.Error()
 	}
 	return val, nil
+}
+
+func (p *UpdateSIPInboundTrunkRequest_Update) ApplyResult(info *SIPInboundTrunkInfo) (*SIPInboundTrunkInfo, ValidationResult) {
+	diff := p.Update
+	if diff == nil {
+		return nil, ValidationFailure(errors.New("missing trunk update"))
+	}
+	val := proto.CloneOf(info)
+	if result := diff.ApplyResult(val); !result.OK() {
+		return nil, result
+	}
+	return val, ValidationResult{}
 }
 
 func (p *CreateSIPDispatchRuleRequest) DispatchRuleInfo() *SIPDispatchRuleInfo {
@@ -596,11 +834,17 @@ func (p *SIPDispatchRuleInfo) Validate() error {
 	if p.Rule == nil {
 		return errors.New("missing rule")
 	}
+	if err := p.Media.Validate(); err != nil {
+		return err
+	}
 	return nil
 }
 
 func (p *SIPDispatchRuleUpdate) Validate() error {
 	if err := p.TrunkIds.Validate(); err != nil {
+		return err
+	}
+	if err := p.Media.Validate(); err != nil {
 		return err
 	}
 	return nil
@@ -614,8 +858,9 @@ func (p *SIPDispatchRuleUpdate) Apply(info *SIPDispatchRuleInfo) error {
 	applyUpdatePtr(&info.Rule, p.Rule)
 	applyUpdate(&info.Name, p.Name)
 	applyUpdate(&info.Metadata, p.Metadata)
-	applyUpdate(&info.MediaEncryption, p.MediaEncryption)
 	applyMapDiff(&info.Attributes, p.Attributes)
+	updateMediaConfig(info, &info.Media, &info.MediaEncryption, p.Media, p.MediaEncryption)
+	info.Upgrade()
 	return info.Validate()
 }
 
@@ -630,7 +875,7 @@ var (
 )
 
 func (p *UpdateSIPDispatchRuleRequest_Replace) Apply(info *SIPDispatchRuleInfo) (*SIPDispatchRuleInfo, error) {
-	val := cloneProto(p.Replace)
+	val := proto.CloneOf(p.Replace)
 	if val == nil {
 		return nil, errors.New("missing dispatch rule")
 	}
@@ -648,7 +893,7 @@ func (p *UpdateSIPDispatchRuleRequest_Update) Apply(info *SIPDispatchRuleInfo) (
 	if diff == nil {
 		return nil, errors.New("missing dispatch rule update")
 	}
-	val := cloneProto(info)
+	val := proto.CloneOf(info)
 	if err := diff.Apply(val); err != nil {
 		return nil, err
 	}
@@ -656,47 +901,103 @@ func (p *UpdateSIPDispatchRuleRequest_Update) Apply(info *SIPDispatchRuleInfo) (
 }
 
 func (p *CreateSIPParticipantRequest) Validate() error {
-	if p.SipTrunkId == "" && p.Trunk == nil {
-		return errors.New("missing sip trunk id")
+	return p.ValidateResult().Error()
+}
+
+func (p *CreateSIPParticipantRequest) ValidateResult() ValidationResult {
+	if p.SipTrunkId == "" && p.Trunk == nil && p.SipNumber == "" {
+		return ValidationFailure(errors.New("missing sip trunk id and sip number"))
 	}
 	if p.Trunk != nil {
 		if err := p.Trunk.Validate(); err != nil {
-			return err
+			return ValidationFailure(err)
 		}
 	}
 	if p.SipCallTo == "" {
-		return errors.New("missing sip callee number")
+		return ValidationFailure(errors.New("missing sip callee number"))
 	} else if strings.Contains(p.SipCallTo, "@") {
-		return errors.New("SipCallTo should be a phone number or SIP user, not a full SIP URI")
+		return ValidationFailure(errors.New("SipCallTo should be a phone number or SIP user, not a full SIP URI"))
 	}
 	if p.RoomName == "" {
-		return errors.New("missing room name")
-	}
-	if err := validateHeaderKeys(p.Headers); err != nil {
-		return err
+		return ValidationFailure(errors.New("missing room name"))
 	}
 
 	// Validate display_name if provided
 	if p.DisplayName != nil {
 		if len(*p.DisplayName) > 128 {
-			return errors.New("display_name too long (max 128 characters)")
+			return ValidationFailure(errors.New("DisplayName too long (max 128 characters)"))
+		}
+		if _, err := strconv.Unquote("\"" + *p.DisplayName + "\""); err != nil {
+			return ValidationFailure(fmt.Errorf("DisplayName must be a valid quoted string: %w", err))
+		}
+	}
+	// Validate destination if provided
+	if err := p.Destination.Validate(); err != nil {
+		return ValidationFailure(err)
+	}
+	result := validateHeaders(p.Headers)
+	if !result.OK() {
+		return result
+	}
+	if err := p.Media.Validate(); err != nil {
+		return result.WithError(err)
+	}
+	return result
+}
+
+func (d *Destination) Validate() error {
+	if d == nil {
+		return nil
+	}
+
+	// Rule 1: If city is specified, country must be specified
+	if d.City != "" && d.Country == "" && d.Region == "" {
+		return errors.New("if city is specified, country or region must also be specified")
+	}
+
+	// Rule 2: If country is specified, it must be a valid ISO 3166-1 alpha-2 code (2-letter only)
+	if d.Country != "" {
+		// First check: must be exactly 2 characters
+		if len(d.Country) != 2 {
+			return errors.New("country must be a valid ISO 3166-1 alpha-2 code (2-letter like 'US', 'IN', 'UK')")
 		}
 
-		// TODO: Validate display name doesn't contain invalid characters
+		// Use golang.org/x/text/language to validate 2-letter country codes
+		region, err := language.ParseRegion(d.Country)
+		if err != nil {
+			return errors.New("country must be a valid ISO 3166-1 alpha-2 code (2-letter like 'US', 'IN', 'UK')")
+		}
+
+		// Check if the parsed region is actually a valid country
+		// This is the most direct way to validate - region.IsCountry() returns true
+		// only for actual valid countries, false for invalid codes like "XX"
+		if !region.IsCountry() {
+			return errors.New("country must be a valid ISO 3166-1 alpha-2 code (2-letter like 'US', 'IN', 'UK')")
+		}
+
+		// Additional check: ensure the parsed region matches our input
+		// This prevents auto corrections by the library
+		if region.String() != d.Country {
+			return errors.New("country must be a valid ISO 3166-1 alpha-2 code (2-letter like 'US', 'IN', 'UK')")
+		}
 	}
 
 	return nil
 }
 
 func (p *TransferSIPParticipantRequest) Validate() error {
+	return p.ValidateResult().Error()
+}
+
+func (p *TransferSIPParticipantRequest) ValidateResult() ValidationResult {
 	if p.RoomName == "" {
-		return errors.New("missing room name")
+		return ValidationFailure(errors.New("missing room name"))
 	}
 	if p.ParticipantIdentity == "" {
-		return errors.New("missing participant identity")
+		return ValidationFailure(errors.New("missing participant identity"))
 	}
 	if p.TransferTo == "" {
-		return errors.New("missing transfer to")
+		return ValidationFailure(errors.New("missing transfer to"))
 	}
 
 	// Validate TransferTo URI format and ensure RFC compliance
@@ -708,13 +1009,13 @@ func (p *TransferSIPParticipantRequest) Validate() error {
 		innerURI = p.TransferTo
 	}
 
-	if !strings.HasPrefix(innerURI, "sip:") && !strings.HasPrefix(innerURI, "tel:") {
+	if !strings.HasPrefix(innerURI, "sip:") && !strings.HasPrefix(innerURI, "sips:") && !strings.HasPrefix(innerURI, "tel:") {
 		// In theory the Refer-To header can receive the full name-addr.
 		// This can make this check inaccurate, but we want to limit to just SIP and TEL URIs.
-		return errors.New("transfer_to must be a valid SIP or TEL URI (sip: or tel:)")
+		return ValidationFailure(errors.New("transfer_to must be a valid SIP(s) or TEL URI (sip:, sips: or tel:)"))
 	}
 
-	if strings.HasPrefix(innerURI, "sip:") {
+	if strings.HasPrefix(innerURI, "sip:") || strings.HasPrefix(innerURI, "sips:") {
 		// addr-spec = sip:...
 		// name-addr = [ display-name ] <addr-spec>
 		// Both name-addr and addr-spec are allowed in RFC3515 (section-2.1).
@@ -725,11 +1026,7 @@ func (p *TransferSIPParticipantRequest) Validate() error {
 		p.TransferTo = innerURI
 	}
 
-	if err := validateHeaderKeys(p.Headers); err != nil {
-		return err
-	}
-
-	return nil
+	return validateHeaders(p.Headers)
 }
 
 func filterSlice[T any](arr []T, fnc func(v T) bool) []T {
@@ -888,3 +1185,139 @@ var (
 		")", "",
 	)
 )
+
+func (p *SIPCodec) Validate() error {
+	if p.Name == "" {
+		return errors.New("missing codec name")
+	}
+	if strings.ContainsAny(p.Name, " \t\n\r") {
+		return errors.New("invalid codec name")
+	}
+	if strings.Contains(p.Name, "/") {
+		return errors.New("codec name must not contain '/'")
+	}
+	return nil
+}
+
+func (p *SIPInboundTrunkInfo) Upgrade() {
+	if p == nil {
+		return
+	}
+	p.Media = p.Media.UpgradeWith(p.MediaEncryption)
+}
+
+func (p *SIPOutboundTrunkInfo) Upgrade() {
+	if p == nil {
+		return
+	}
+	p.Media = p.Media.UpgradeWith(p.MediaEncryption)
+}
+
+func (p *SIPDispatchRuleInfo) Upgrade() {
+	if p == nil {
+		return
+	}
+	p.Media = p.Media.UpgradeWith(p.MediaEncryption)
+}
+
+func (p *CreateSIPParticipantRequest) Upgrade() {
+	if p == nil {
+		return
+	}
+	p.Media = p.Media.UpgradeWith(p.MediaEncryption)
+}
+
+func (p *SIPMediaEncryption) Deref() SIPMediaEncryption {
+	if p == nil {
+		return SIPMediaEncryption_SIP_MEDIA_ENCRYPT_DISABLE
+	}
+	return *p
+}
+
+func (p *SIPMediaConfig) Validate() error {
+	if p == nil { // When optional, p can be nil
+		return nil
+	}
+	for _, c := range p.Codecs {
+		if err := c.Validate(); err != nil {
+			return err
+		}
+	}
+	if p.MediaTimeout != nil {
+		dur := p.MediaTimeout.AsDuration()
+		if dur < 0 {
+			return errors.New("media_timeout must not be negative")
+		}
+		// Zero means use default
+		if dur > MaxSIPMediaTimeout {
+			return fmt.Errorf("media_timeout must not exceed %v", MaxSIPMediaTimeout)
+		}
+	}
+	return nil
+}
+
+func (p *SIPMediaConfig) UpgradeWith(enc SIPMediaEncryption) *SIPMediaConfig {
+	if p == nil {
+		p = new(SIPMediaConfig)
+	}
+	// Ignore DISABLE as it's a zero value which means "unset".
+	if p.Encryption == nil && enc != SIPMediaEncryption_SIP_MEDIA_ENCRYPT_DISABLE {
+		p.Encryption = &enc
+	}
+	return p
+}
+
+func (p *SIPMediaConfig) Merge(p2 *SIPMediaConfig) *SIPMediaConfig {
+	if p == nil {
+		return p2
+	}
+	if p2 == nil {
+		return p
+	}
+	r := proto.CloneOf(p2)
+	r.Encryption = p.Encryption.Merge(p2.Encryption)
+	if p2.MediaTimeout == nil {
+		r.MediaTimeout = p.MediaTimeout
+	}
+	if len(p2.Codecs) == 0 {
+		r.OnlyListedCodecs = p.OnlyListedCodecs
+		r.Codecs = p.Codecs
+	}
+	return r
+}
+
+func updateMediaConfig(
+	info interface{ Upgrade() },
+	dstMedia **SIPMediaConfig, dstEnc *SIPMediaEncryption,
+	media *SIPMediaConfig, enc *SIPMediaEncryption,
+) {
+	applyUpdatePtr(dstMedia, media) // TODO: Consider applying partial updates
+	applyUpdate(dstEnc, enc)
+	info.Upgrade()
+	// downgrade to a legacy field
+	if m := *dstMedia; m != nil {
+		*dstEnc = m.Encryption.Deref()
+	}
+}
+
+func (p *SIPMediaEncryption) Merge(p2 *SIPMediaEncryption) *SIPMediaEncryption {
+	if p == nil {
+		return p2
+	}
+	if p2 == nil {
+		return p
+	}
+	v := *p
+	v = v.MergeValue(*p2)
+	return &v
+}
+
+func (p SIPMediaEncryption) MergeValue(p2 SIPMediaEncryption) SIPMediaEncryption {
+	if p == p2 {
+		return p2
+	}
+	if p2 == SIPMediaEncryption_SIP_MEDIA_ENCRYPT_DISABLE {
+		return p
+	}
+	return p2
+}

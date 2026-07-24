@@ -29,6 +29,10 @@ const _ = twirp.TwirpPackageMinVersion_8_1_0
 type CloudAgent interface {
 	CreateAgent(context.Context, *CreateAgentRequest) (*CreateAgentResponse, error)
 
+	CreateAgentV2(context.Context, *CreateAgentV2Request) (*CreateAgentV2Response, error)
+
+	PromoteAgent(context.Context, *PromoteAgentRequest) (*PromoteAgentResponse, error)
+
 	ListAgents(context.Context, *ListAgentsRequest) (*ListAgentsResponse, error)
 
 	ListAgentVersions(context.Context, *ListAgentVersionsRequest) (*ListAgentVersionsResponse, error)
@@ -41,6 +45,8 @@ type CloudAgent interface {
 
 	DeployAgent(context.Context, *DeployAgentRequest) (*DeployAgentResponse, error)
 
+	DeployAgentV2(context.Context, *DeployAgentV2Request) (*DeployAgentV2Response, error)
+
 	UpdateAgentSecrets(context.Context, *UpdateAgentSecretsRequest) (*UpdateAgentSecretsResponse, error)
 
 	RollbackAgent(context.Context, *RollbackAgentRequest) (*RollbackAgentResponse, error)
@@ -48,6 +54,14 @@ type CloudAgent interface {
 	DeleteAgent(context.Context, *DeleteAgentRequest) (*DeleteAgentResponse, error)
 
 	GetClientSettings(context.Context, *ClientSettingsRequest) (*ClientSettingsResponse, error)
+
+	CreatePrivateLink(context.Context, *CreatePrivateLinkRequest) (*CreatePrivateLinkResponse, error)
+
+	DestroyPrivateLink(context.Context, *DestroyPrivateLinkRequest) (*DestroyPrivateLinkResponse, error)
+
+	ListPrivateLinks(context.Context, *ListPrivateLinksRequest) (*ListPrivateLinksResponse, error)
+
+	GetPrivateLinkStatus(context.Context, *GetPrivateLinkStatusRequest) (*GetPrivateLinkStatusResponse, error)
 }
 
 // ==========================
@@ -56,7 +70,7 @@ type CloudAgent interface {
 
 type cloudAgentProtobufClient struct {
 	client      HTTPClient
-	urls        [11]string
+	urls        [18]string
 	interceptor twirp.Interceptor
 	opts        twirp.ClientOptions
 }
@@ -84,18 +98,25 @@ func NewCloudAgentProtobufClient(baseURL string, client HTTPClient, opts ...twir
 	// Build method URLs: <baseURL>[<prefix>]/<package>.<Service>/<Method>
 	serviceURL := sanitizeBaseURL(baseURL)
 	serviceURL += baseServicePath(pathPrefix, "livekit", "CloudAgent")
-	urls := [11]string{
+	urls := [18]string{
 		serviceURL + "CreateAgent",
+		serviceURL + "CreateAgentV2",
+		serviceURL + "PromoteAgent",
 		serviceURL + "ListAgents",
 		serviceURL + "ListAgentVersions",
 		serviceURL + "ListAgentSecrets",
 		serviceURL + "UpdateAgent",
 		serviceURL + "RestartAgent",
 		serviceURL + "DeployAgent",
+		serviceURL + "DeployAgentV2",
 		serviceURL + "UpdateAgentSecrets",
 		serviceURL + "RollbackAgent",
 		serviceURL + "DeleteAgent",
 		serviceURL + "GetClientSettings",
+		serviceURL + "CreatePrivateLink",
+		serviceURL + "DestroyPrivateLink",
+		serviceURL + "ListPrivateLinks",
+		serviceURL + "GetPrivateLinkStatus",
 	}
 
 	return &cloudAgentProtobufClient{
@@ -152,6 +173,98 @@ func (c *cloudAgentProtobufClient) callCreateAgent(ctx context.Context, in *Crea
 	return out, nil
 }
 
+func (c *cloudAgentProtobufClient) CreateAgentV2(ctx context.Context, in *CreateAgentV2Request) (*CreateAgentV2Response, error) {
+	ctx = ctxsetters.WithPackageName(ctx, "livekit")
+	ctx = ctxsetters.WithServiceName(ctx, "CloudAgent")
+	ctx = ctxsetters.WithMethodName(ctx, "CreateAgentV2")
+	caller := c.callCreateAgentV2
+	if c.interceptor != nil {
+		caller = func(ctx context.Context, req *CreateAgentV2Request) (*CreateAgentV2Response, error) {
+			resp, err := c.interceptor(
+				func(ctx context.Context, req interface{}) (interface{}, error) {
+					typedReq, ok := req.(*CreateAgentV2Request)
+					if !ok {
+						return nil, twirp.InternalError("failed type assertion req.(*CreateAgentV2Request) when calling interceptor")
+					}
+					return c.callCreateAgentV2(ctx, typedReq)
+				},
+			)(ctx, req)
+			if resp != nil {
+				typedResp, ok := resp.(*CreateAgentV2Response)
+				if !ok {
+					return nil, twirp.InternalError("failed type assertion resp.(*CreateAgentV2Response) when calling interceptor")
+				}
+				return typedResp, err
+			}
+			return nil, err
+		}
+	}
+	return caller(ctx, in)
+}
+
+func (c *cloudAgentProtobufClient) callCreateAgentV2(ctx context.Context, in *CreateAgentV2Request) (*CreateAgentV2Response, error) {
+	out := new(CreateAgentV2Response)
+	ctx, err := doProtobufRequest(ctx, c.client, c.opts.Hooks, c.urls[1], in, out)
+	if err != nil {
+		twerr, ok := err.(twirp.Error)
+		if !ok {
+			twerr = twirp.InternalErrorWith(err)
+		}
+		callClientError(ctx, c.opts.Hooks, twerr)
+		return nil, err
+	}
+
+	callClientResponseReceived(ctx, c.opts.Hooks)
+
+	return out, nil
+}
+
+func (c *cloudAgentProtobufClient) PromoteAgent(ctx context.Context, in *PromoteAgentRequest) (*PromoteAgentResponse, error) {
+	ctx = ctxsetters.WithPackageName(ctx, "livekit")
+	ctx = ctxsetters.WithServiceName(ctx, "CloudAgent")
+	ctx = ctxsetters.WithMethodName(ctx, "PromoteAgent")
+	caller := c.callPromoteAgent
+	if c.interceptor != nil {
+		caller = func(ctx context.Context, req *PromoteAgentRequest) (*PromoteAgentResponse, error) {
+			resp, err := c.interceptor(
+				func(ctx context.Context, req interface{}) (interface{}, error) {
+					typedReq, ok := req.(*PromoteAgentRequest)
+					if !ok {
+						return nil, twirp.InternalError("failed type assertion req.(*PromoteAgentRequest) when calling interceptor")
+					}
+					return c.callPromoteAgent(ctx, typedReq)
+				},
+			)(ctx, req)
+			if resp != nil {
+				typedResp, ok := resp.(*PromoteAgentResponse)
+				if !ok {
+					return nil, twirp.InternalError("failed type assertion resp.(*PromoteAgentResponse) when calling interceptor")
+				}
+				return typedResp, err
+			}
+			return nil, err
+		}
+	}
+	return caller(ctx, in)
+}
+
+func (c *cloudAgentProtobufClient) callPromoteAgent(ctx context.Context, in *PromoteAgentRequest) (*PromoteAgentResponse, error) {
+	out := new(PromoteAgentResponse)
+	ctx, err := doProtobufRequest(ctx, c.client, c.opts.Hooks, c.urls[2], in, out)
+	if err != nil {
+		twerr, ok := err.(twirp.Error)
+		if !ok {
+			twerr = twirp.InternalErrorWith(err)
+		}
+		callClientError(ctx, c.opts.Hooks, twerr)
+		return nil, err
+	}
+
+	callClientResponseReceived(ctx, c.opts.Hooks)
+
+	return out, nil
+}
+
 func (c *cloudAgentProtobufClient) ListAgents(ctx context.Context, in *ListAgentsRequest) (*ListAgentsResponse, error) {
 	ctx = ctxsetters.WithPackageName(ctx, "livekit")
 	ctx = ctxsetters.WithServiceName(ctx, "CloudAgent")
@@ -183,7 +296,7 @@ func (c *cloudAgentProtobufClient) ListAgents(ctx context.Context, in *ListAgent
 
 func (c *cloudAgentProtobufClient) callListAgents(ctx context.Context, in *ListAgentsRequest) (*ListAgentsResponse, error) {
 	out := new(ListAgentsResponse)
-	ctx, err := doProtobufRequest(ctx, c.client, c.opts.Hooks, c.urls[1], in, out)
+	ctx, err := doProtobufRequest(ctx, c.client, c.opts.Hooks, c.urls[3], in, out)
 	if err != nil {
 		twerr, ok := err.(twirp.Error)
 		if !ok {
@@ -229,7 +342,7 @@ func (c *cloudAgentProtobufClient) ListAgentVersions(ctx context.Context, in *Li
 
 func (c *cloudAgentProtobufClient) callListAgentVersions(ctx context.Context, in *ListAgentVersionsRequest) (*ListAgentVersionsResponse, error) {
 	out := new(ListAgentVersionsResponse)
-	ctx, err := doProtobufRequest(ctx, c.client, c.opts.Hooks, c.urls[2], in, out)
+	ctx, err := doProtobufRequest(ctx, c.client, c.opts.Hooks, c.urls[4], in, out)
 	if err != nil {
 		twerr, ok := err.(twirp.Error)
 		if !ok {
@@ -275,7 +388,7 @@ func (c *cloudAgentProtobufClient) ListAgentSecrets(ctx context.Context, in *Lis
 
 func (c *cloudAgentProtobufClient) callListAgentSecrets(ctx context.Context, in *ListAgentSecretsRequest) (*ListAgentSecretsResponse, error) {
 	out := new(ListAgentSecretsResponse)
-	ctx, err := doProtobufRequest(ctx, c.client, c.opts.Hooks, c.urls[3], in, out)
+	ctx, err := doProtobufRequest(ctx, c.client, c.opts.Hooks, c.urls[5], in, out)
 	if err != nil {
 		twerr, ok := err.(twirp.Error)
 		if !ok {
@@ -321,7 +434,7 @@ func (c *cloudAgentProtobufClient) UpdateAgent(ctx context.Context, in *UpdateAg
 
 func (c *cloudAgentProtobufClient) callUpdateAgent(ctx context.Context, in *UpdateAgentRequest) (*UpdateAgentResponse, error) {
 	out := new(UpdateAgentResponse)
-	ctx, err := doProtobufRequest(ctx, c.client, c.opts.Hooks, c.urls[4], in, out)
+	ctx, err := doProtobufRequest(ctx, c.client, c.opts.Hooks, c.urls[6], in, out)
 	if err != nil {
 		twerr, ok := err.(twirp.Error)
 		if !ok {
@@ -367,7 +480,7 @@ func (c *cloudAgentProtobufClient) RestartAgent(ctx context.Context, in *Restart
 
 func (c *cloudAgentProtobufClient) callRestartAgent(ctx context.Context, in *RestartAgentRequest) (*RestartAgentResponse, error) {
 	out := new(RestartAgentResponse)
-	ctx, err := doProtobufRequest(ctx, c.client, c.opts.Hooks, c.urls[5], in, out)
+	ctx, err := doProtobufRequest(ctx, c.client, c.opts.Hooks, c.urls[7], in, out)
 	if err != nil {
 		twerr, ok := err.(twirp.Error)
 		if !ok {
@@ -413,7 +526,53 @@ func (c *cloudAgentProtobufClient) DeployAgent(ctx context.Context, in *DeployAg
 
 func (c *cloudAgentProtobufClient) callDeployAgent(ctx context.Context, in *DeployAgentRequest) (*DeployAgentResponse, error) {
 	out := new(DeployAgentResponse)
-	ctx, err := doProtobufRequest(ctx, c.client, c.opts.Hooks, c.urls[6], in, out)
+	ctx, err := doProtobufRequest(ctx, c.client, c.opts.Hooks, c.urls[8], in, out)
+	if err != nil {
+		twerr, ok := err.(twirp.Error)
+		if !ok {
+			twerr = twirp.InternalErrorWith(err)
+		}
+		callClientError(ctx, c.opts.Hooks, twerr)
+		return nil, err
+	}
+
+	callClientResponseReceived(ctx, c.opts.Hooks)
+
+	return out, nil
+}
+
+func (c *cloudAgentProtobufClient) DeployAgentV2(ctx context.Context, in *DeployAgentV2Request) (*DeployAgentV2Response, error) {
+	ctx = ctxsetters.WithPackageName(ctx, "livekit")
+	ctx = ctxsetters.WithServiceName(ctx, "CloudAgent")
+	ctx = ctxsetters.WithMethodName(ctx, "DeployAgentV2")
+	caller := c.callDeployAgentV2
+	if c.interceptor != nil {
+		caller = func(ctx context.Context, req *DeployAgentV2Request) (*DeployAgentV2Response, error) {
+			resp, err := c.interceptor(
+				func(ctx context.Context, req interface{}) (interface{}, error) {
+					typedReq, ok := req.(*DeployAgentV2Request)
+					if !ok {
+						return nil, twirp.InternalError("failed type assertion req.(*DeployAgentV2Request) when calling interceptor")
+					}
+					return c.callDeployAgentV2(ctx, typedReq)
+				},
+			)(ctx, req)
+			if resp != nil {
+				typedResp, ok := resp.(*DeployAgentV2Response)
+				if !ok {
+					return nil, twirp.InternalError("failed type assertion resp.(*DeployAgentV2Response) when calling interceptor")
+				}
+				return typedResp, err
+			}
+			return nil, err
+		}
+	}
+	return caller(ctx, in)
+}
+
+func (c *cloudAgentProtobufClient) callDeployAgentV2(ctx context.Context, in *DeployAgentV2Request) (*DeployAgentV2Response, error) {
+	out := new(DeployAgentV2Response)
+	ctx, err := doProtobufRequest(ctx, c.client, c.opts.Hooks, c.urls[9], in, out)
 	if err != nil {
 		twerr, ok := err.(twirp.Error)
 		if !ok {
@@ -459,7 +618,7 @@ func (c *cloudAgentProtobufClient) UpdateAgentSecrets(ctx context.Context, in *U
 
 func (c *cloudAgentProtobufClient) callUpdateAgentSecrets(ctx context.Context, in *UpdateAgentSecretsRequest) (*UpdateAgentSecretsResponse, error) {
 	out := new(UpdateAgentSecretsResponse)
-	ctx, err := doProtobufRequest(ctx, c.client, c.opts.Hooks, c.urls[7], in, out)
+	ctx, err := doProtobufRequest(ctx, c.client, c.opts.Hooks, c.urls[10], in, out)
 	if err != nil {
 		twerr, ok := err.(twirp.Error)
 		if !ok {
@@ -505,7 +664,7 @@ func (c *cloudAgentProtobufClient) RollbackAgent(ctx context.Context, in *Rollba
 
 func (c *cloudAgentProtobufClient) callRollbackAgent(ctx context.Context, in *RollbackAgentRequest) (*RollbackAgentResponse, error) {
 	out := new(RollbackAgentResponse)
-	ctx, err := doProtobufRequest(ctx, c.client, c.opts.Hooks, c.urls[8], in, out)
+	ctx, err := doProtobufRequest(ctx, c.client, c.opts.Hooks, c.urls[11], in, out)
 	if err != nil {
 		twerr, ok := err.(twirp.Error)
 		if !ok {
@@ -551,7 +710,7 @@ func (c *cloudAgentProtobufClient) DeleteAgent(ctx context.Context, in *DeleteAg
 
 func (c *cloudAgentProtobufClient) callDeleteAgent(ctx context.Context, in *DeleteAgentRequest) (*DeleteAgentResponse, error) {
 	out := new(DeleteAgentResponse)
-	ctx, err := doProtobufRequest(ctx, c.client, c.opts.Hooks, c.urls[9], in, out)
+	ctx, err := doProtobufRequest(ctx, c.client, c.opts.Hooks, c.urls[12], in, out)
 	if err != nil {
 		twerr, ok := err.(twirp.Error)
 		if !ok {
@@ -597,7 +756,191 @@ func (c *cloudAgentProtobufClient) GetClientSettings(ctx context.Context, in *Cl
 
 func (c *cloudAgentProtobufClient) callGetClientSettings(ctx context.Context, in *ClientSettingsRequest) (*ClientSettingsResponse, error) {
 	out := new(ClientSettingsResponse)
-	ctx, err := doProtobufRequest(ctx, c.client, c.opts.Hooks, c.urls[10], in, out)
+	ctx, err := doProtobufRequest(ctx, c.client, c.opts.Hooks, c.urls[13], in, out)
+	if err != nil {
+		twerr, ok := err.(twirp.Error)
+		if !ok {
+			twerr = twirp.InternalErrorWith(err)
+		}
+		callClientError(ctx, c.opts.Hooks, twerr)
+		return nil, err
+	}
+
+	callClientResponseReceived(ctx, c.opts.Hooks)
+
+	return out, nil
+}
+
+func (c *cloudAgentProtobufClient) CreatePrivateLink(ctx context.Context, in *CreatePrivateLinkRequest) (*CreatePrivateLinkResponse, error) {
+	ctx = ctxsetters.WithPackageName(ctx, "livekit")
+	ctx = ctxsetters.WithServiceName(ctx, "CloudAgent")
+	ctx = ctxsetters.WithMethodName(ctx, "CreatePrivateLink")
+	caller := c.callCreatePrivateLink
+	if c.interceptor != nil {
+		caller = func(ctx context.Context, req *CreatePrivateLinkRequest) (*CreatePrivateLinkResponse, error) {
+			resp, err := c.interceptor(
+				func(ctx context.Context, req interface{}) (interface{}, error) {
+					typedReq, ok := req.(*CreatePrivateLinkRequest)
+					if !ok {
+						return nil, twirp.InternalError("failed type assertion req.(*CreatePrivateLinkRequest) when calling interceptor")
+					}
+					return c.callCreatePrivateLink(ctx, typedReq)
+				},
+			)(ctx, req)
+			if resp != nil {
+				typedResp, ok := resp.(*CreatePrivateLinkResponse)
+				if !ok {
+					return nil, twirp.InternalError("failed type assertion resp.(*CreatePrivateLinkResponse) when calling interceptor")
+				}
+				return typedResp, err
+			}
+			return nil, err
+		}
+	}
+	return caller(ctx, in)
+}
+
+func (c *cloudAgentProtobufClient) callCreatePrivateLink(ctx context.Context, in *CreatePrivateLinkRequest) (*CreatePrivateLinkResponse, error) {
+	out := new(CreatePrivateLinkResponse)
+	ctx, err := doProtobufRequest(ctx, c.client, c.opts.Hooks, c.urls[14], in, out)
+	if err != nil {
+		twerr, ok := err.(twirp.Error)
+		if !ok {
+			twerr = twirp.InternalErrorWith(err)
+		}
+		callClientError(ctx, c.opts.Hooks, twerr)
+		return nil, err
+	}
+
+	callClientResponseReceived(ctx, c.opts.Hooks)
+
+	return out, nil
+}
+
+func (c *cloudAgentProtobufClient) DestroyPrivateLink(ctx context.Context, in *DestroyPrivateLinkRequest) (*DestroyPrivateLinkResponse, error) {
+	ctx = ctxsetters.WithPackageName(ctx, "livekit")
+	ctx = ctxsetters.WithServiceName(ctx, "CloudAgent")
+	ctx = ctxsetters.WithMethodName(ctx, "DestroyPrivateLink")
+	caller := c.callDestroyPrivateLink
+	if c.interceptor != nil {
+		caller = func(ctx context.Context, req *DestroyPrivateLinkRequest) (*DestroyPrivateLinkResponse, error) {
+			resp, err := c.interceptor(
+				func(ctx context.Context, req interface{}) (interface{}, error) {
+					typedReq, ok := req.(*DestroyPrivateLinkRequest)
+					if !ok {
+						return nil, twirp.InternalError("failed type assertion req.(*DestroyPrivateLinkRequest) when calling interceptor")
+					}
+					return c.callDestroyPrivateLink(ctx, typedReq)
+				},
+			)(ctx, req)
+			if resp != nil {
+				typedResp, ok := resp.(*DestroyPrivateLinkResponse)
+				if !ok {
+					return nil, twirp.InternalError("failed type assertion resp.(*DestroyPrivateLinkResponse) when calling interceptor")
+				}
+				return typedResp, err
+			}
+			return nil, err
+		}
+	}
+	return caller(ctx, in)
+}
+
+func (c *cloudAgentProtobufClient) callDestroyPrivateLink(ctx context.Context, in *DestroyPrivateLinkRequest) (*DestroyPrivateLinkResponse, error) {
+	out := new(DestroyPrivateLinkResponse)
+	ctx, err := doProtobufRequest(ctx, c.client, c.opts.Hooks, c.urls[15], in, out)
+	if err != nil {
+		twerr, ok := err.(twirp.Error)
+		if !ok {
+			twerr = twirp.InternalErrorWith(err)
+		}
+		callClientError(ctx, c.opts.Hooks, twerr)
+		return nil, err
+	}
+
+	callClientResponseReceived(ctx, c.opts.Hooks)
+
+	return out, nil
+}
+
+func (c *cloudAgentProtobufClient) ListPrivateLinks(ctx context.Context, in *ListPrivateLinksRequest) (*ListPrivateLinksResponse, error) {
+	ctx = ctxsetters.WithPackageName(ctx, "livekit")
+	ctx = ctxsetters.WithServiceName(ctx, "CloudAgent")
+	ctx = ctxsetters.WithMethodName(ctx, "ListPrivateLinks")
+	caller := c.callListPrivateLinks
+	if c.interceptor != nil {
+		caller = func(ctx context.Context, req *ListPrivateLinksRequest) (*ListPrivateLinksResponse, error) {
+			resp, err := c.interceptor(
+				func(ctx context.Context, req interface{}) (interface{}, error) {
+					typedReq, ok := req.(*ListPrivateLinksRequest)
+					if !ok {
+						return nil, twirp.InternalError("failed type assertion req.(*ListPrivateLinksRequest) when calling interceptor")
+					}
+					return c.callListPrivateLinks(ctx, typedReq)
+				},
+			)(ctx, req)
+			if resp != nil {
+				typedResp, ok := resp.(*ListPrivateLinksResponse)
+				if !ok {
+					return nil, twirp.InternalError("failed type assertion resp.(*ListPrivateLinksResponse) when calling interceptor")
+				}
+				return typedResp, err
+			}
+			return nil, err
+		}
+	}
+	return caller(ctx, in)
+}
+
+func (c *cloudAgentProtobufClient) callListPrivateLinks(ctx context.Context, in *ListPrivateLinksRequest) (*ListPrivateLinksResponse, error) {
+	out := new(ListPrivateLinksResponse)
+	ctx, err := doProtobufRequest(ctx, c.client, c.opts.Hooks, c.urls[16], in, out)
+	if err != nil {
+		twerr, ok := err.(twirp.Error)
+		if !ok {
+			twerr = twirp.InternalErrorWith(err)
+		}
+		callClientError(ctx, c.opts.Hooks, twerr)
+		return nil, err
+	}
+
+	callClientResponseReceived(ctx, c.opts.Hooks)
+
+	return out, nil
+}
+
+func (c *cloudAgentProtobufClient) GetPrivateLinkStatus(ctx context.Context, in *GetPrivateLinkStatusRequest) (*GetPrivateLinkStatusResponse, error) {
+	ctx = ctxsetters.WithPackageName(ctx, "livekit")
+	ctx = ctxsetters.WithServiceName(ctx, "CloudAgent")
+	ctx = ctxsetters.WithMethodName(ctx, "GetPrivateLinkStatus")
+	caller := c.callGetPrivateLinkStatus
+	if c.interceptor != nil {
+		caller = func(ctx context.Context, req *GetPrivateLinkStatusRequest) (*GetPrivateLinkStatusResponse, error) {
+			resp, err := c.interceptor(
+				func(ctx context.Context, req interface{}) (interface{}, error) {
+					typedReq, ok := req.(*GetPrivateLinkStatusRequest)
+					if !ok {
+						return nil, twirp.InternalError("failed type assertion req.(*GetPrivateLinkStatusRequest) when calling interceptor")
+					}
+					return c.callGetPrivateLinkStatus(ctx, typedReq)
+				},
+			)(ctx, req)
+			if resp != nil {
+				typedResp, ok := resp.(*GetPrivateLinkStatusResponse)
+				if !ok {
+					return nil, twirp.InternalError("failed type assertion resp.(*GetPrivateLinkStatusResponse) when calling interceptor")
+				}
+				return typedResp, err
+			}
+			return nil, err
+		}
+	}
+	return caller(ctx, in)
+}
+
+func (c *cloudAgentProtobufClient) callGetPrivateLinkStatus(ctx context.Context, in *GetPrivateLinkStatusRequest) (*GetPrivateLinkStatusResponse, error) {
+	out := new(GetPrivateLinkStatusResponse)
+	ctx, err := doProtobufRequest(ctx, c.client, c.opts.Hooks, c.urls[17], in, out)
 	if err != nil {
 		twerr, ok := err.(twirp.Error)
 		if !ok {
@@ -618,7 +961,7 @@ func (c *cloudAgentProtobufClient) callGetClientSettings(ctx context.Context, in
 
 type cloudAgentJSONClient struct {
 	client      HTTPClient
-	urls        [11]string
+	urls        [18]string
 	interceptor twirp.Interceptor
 	opts        twirp.ClientOptions
 }
@@ -646,18 +989,25 @@ func NewCloudAgentJSONClient(baseURL string, client HTTPClient, opts ...twirp.Cl
 	// Build method URLs: <baseURL>[<prefix>]/<package>.<Service>/<Method>
 	serviceURL := sanitizeBaseURL(baseURL)
 	serviceURL += baseServicePath(pathPrefix, "livekit", "CloudAgent")
-	urls := [11]string{
+	urls := [18]string{
 		serviceURL + "CreateAgent",
+		serviceURL + "CreateAgentV2",
+		serviceURL + "PromoteAgent",
 		serviceURL + "ListAgents",
 		serviceURL + "ListAgentVersions",
 		serviceURL + "ListAgentSecrets",
 		serviceURL + "UpdateAgent",
 		serviceURL + "RestartAgent",
 		serviceURL + "DeployAgent",
+		serviceURL + "DeployAgentV2",
 		serviceURL + "UpdateAgentSecrets",
 		serviceURL + "RollbackAgent",
 		serviceURL + "DeleteAgent",
 		serviceURL + "GetClientSettings",
+		serviceURL + "CreatePrivateLink",
+		serviceURL + "DestroyPrivateLink",
+		serviceURL + "ListPrivateLinks",
+		serviceURL + "GetPrivateLinkStatus",
 	}
 
 	return &cloudAgentJSONClient{
@@ -714,6 +1064,98 @@ func (c *cloudAgentJSONClient) callCreateAgent(ctx context.Context, in *CreateAg
 	return out, nil
 }
 
+func (c *cloudAgentJSONClient) CreateAgentV2(ctx context.Context, in *CreateAgentV2Request) (*CreateAgentV2Response, error) {
+	ctx = ctxsetters.WithPackageName(ctx, "livekit")
+	ctx = ctxsetters.WithServiceName(ctx, "CloudAgent")
+	ctx = ctxsetters.WithMethodName(ctx, "CreateAgentV2")
+	caller := c.callCreateAgentV2
+	if c.interceptor != nil {
+		caller = func(ctx context.Context, req *CreateAgentV2Request) (*CreateAgentV2Response, error) {
+			resp, err := c.interceptor(
+				func(ctx context.Context, req interface{}) (interface{}, error) {
+					typedReq, ok := req.(*CreateAgentV2Request)
+					if !ok {
+						return nil, twirp.InternalError("failed type assertion req.(*CreateAgentV2Request) when calling interceptor")
+					}
+					return c.callCreateAgentV2(ctx, typedReq)
+				},
+			)(ctx, req)
+			if resp != nil {
+				typedResp, ok := resp.(*CreateAgentV2Response)
+				if !ok {
+					return nil, twirp.InternalError("failed type assertion resp.(*CreateAgentV2Response) when calling interceptor")
+				}
+				return typedResp, err
+			}
+			return nil, err
+		}
+	}
+	return caller(ctx, in)
+}
+
+func (c *cloudAgentJSONClient) callCreateAgentV2(ctx context.Context, in *CreateAgentV2Request) (*CreateAgentV2Response, error) {
+	out := new(CreateAgentV2Response)
+	ctx, err := doJSONRequest(ctx, c.client, c.opts.Hooks, c.urls[1], in, out)
+	if err != nil {
+		twerr, ok := err.(twirp.Error)
+		if !ok {
+			twerr = twirp.InternalErrorWith(err)
+		}
+		callClientError(ctx, c.opts.Hooks, twerr)
+		return nil, err
+	}
+
+	callClientResponseReceived(ctx, c.opts.Hooks)
+
+	return out, nil
+}
+
+func (c *cloudAgentJSONClient) PromoteAgent(ctx context.Context, in *PromoteAgentRequest) (*PromoteAgentResponse, error) {
+	ctx = ctxsetters.WithPackageName(ctx, "livekit")
+	ctx = ctxsetters.WithServiceName(ctx, "CloudAgent")
+	ctx = ctxsetters.WithMethodName(ctx, "PromoteAgent")
+	caller := c.callPromoteAgent
+	if c.interceptor != nil {
+		caller = func(ctx context.Context, req *PromoteAgentRequest) (*PromoteAgentResponse, error) {
+			resp, err := c.interceptor(
+				func(ctx context.Context, req interface{}) (interface{}, error) {
+					typedReq, ok := req.(*PromoteAgentRequest)
+					if !ok {
+						return nil, twirp.InternalError("failed type assertion req.(*PromoteAgentRequest) when calling interceptor")
+					}
+					return c.callPromoteAgent(ctx, typedReq)
+				},
+			)(ctx, req)
+			if resp != nil {
+				typedResp, ok := resp.(*PromoteAgentResponse)
+				if !ok {
+					return nil, twirp.InternalError("failed type assertion resp.(*PromoteAgentResponse) when calling interceptor")
+				}
+				return typedResp, err
+			}
+			return nil, err
+		}
+	}
+	return caller(ctx, in)
+}
+
+func (c *cloudAgentJSONClient) callPromoteAgent(ctx context.Context, in *PromoteAgentRequest) (*PromoteAgentResponse, error) {
+	out := new(PromoteAgentResponse)
+	ctx, err := doJSONRequest(ctx, c.client, c.opts.Hooks, c.urls[2], in, out)
+	if err != nil {
+		twerr, ok := err.(twirp.Error)
+		if !ok {
+			twerr = twirp.InternalErrorWith(err)
+		}
+		callClientError(ctx, c.opts.Hooks, twerr)
+		return nil, err
+	}
+
+	callClientResponseReceived(ctx, c.opts.Hooks)
+
+	return out, nil
+}
+
 func (c *cloudAgentJSONClient) ListAgents(ctx context.Context, in *ListAgentsRequest) (*ListAgentsResponse, error) {
 	ctx = ctxsetters.WithPackageName(ctx, "livekit")
 	ctx = ctxsetters.WithServiceName(ctx, "CloudAgent")
@@ -745,7 +1187,7 @@ func (c *cloudAgentJSONClient) ListAgents(ctx context.Context, in *ListAgentsReq
 
 func (c *cloudAgentJSONClient) callListAgents(ctx context.Context, in *ListAgentsRequest) (*ListAgentsResponse, error) {
 	out := new(ListAgentsResponse)
-	ctx, err := doJSONRequest(ctx, c.client, c.opts.Hooks, c.urls[1], in, out)
+	ctx, err := doJSONRequest(ctx, c.client, c.opts.Hooks, c.urls[3], in, out)
 	if err != nil {
 		twerr, ok := err.(twirp.Error)
 		if !ok {
@@ -791,7 +1233,7 @@ func (c *cloudAgentJSONClient) ListAgentVersions(ctx context.Context, in *ListAg
 
 func (c *cloudAgentJSONClient) callListAgentVersions(ctx context.Context, in *ListAgentVersionsRequest) (*ListAgentVersionsResponse, error) {
 	out := new(ListAgentVersionsResponse)
-	ctx, err := doJSONRequest(ctx, c.client, c.opts.Hooks, c.urls[2], in, out)
+	ctx, err := doJSONRequest(ctx, c.client, c.opts.Hooks, c.urls[4], in, out)
 	if err != nil {
 		twerr, ok := err.(twirp.Error)
 		if !ok {
@@ -837,7 +1279,7 @@ func (c *cloudAgentJSONClient) ListAgentSecrets(ctx context.Context, in *ListAge
 
 func (c *cloudAgentJSONClient) callListAgentSecrets(ctx context.Context, in *ListAgentSecretsRequest) (*ListAgentSecretsResponse, error) {
 	out := new(ListAgentSecretsResponse)
-	ctx, err := doJSONRequest(ctx, c.client, c.opts.Hooks, c.urls[3], in, out)
+	ctx, err := doJSONRequest(ctx, c.client, c.opts.Hooks, c.urls[5], in, out)
 	if err != nil {
 		twerr, ok := err.(twirp.Error)
 		if !ok {
@@ -883,7 +1325,7 @@ func (c *cloudAgentJSONClient) UpdateAgent(ctx context.Context, in *UpdateAgentR
 
 func (c *cloudAgentJSONClient) callUpdateAgent(ctx context.Context, in *UpdateAgentRequest) (*UpdateAgentResponse, error) {
 	out := new(UpdateAgentResponse)
-	ctx, err := doJSONRequest(ctx, c.client, c.opts.Hooks, c.urls[4], in, out)
+	ctx, err := doJSONRequest(ctx, c.client, c.opts.Hooks, c.urls[6], in, out)
 	if err != nil {
 		twerr, ok := err.(twirp.Error)
 		if !ok {
@@ -929,7 +1371,7 @@ func (c *cloudAgentJSONClient) RestartAgent(ctx context.Context, in *RestartAgen
 
 func (c *cloudAgentJSONClient) callRestartAgent(ctx context.Context, in *RestartAgentRequest) (*RestartAgentResponse, error) {
 	out := new(RestartAgentResponse)
-	ctx, err := doJSONRequest(ctx, c.client, c.opts.Hooks, c.urls[5], in, out)
+	ctx, err := doJSONRequest(ctx, c.client, c.opts.Hooks, c.urls[7], in, out)
 	if err != nil {
 		twerr, ok := err.(twirp.Error)
 		if !ok {
@@ -975,7 +1417,53 @@ func (c *cloudAgentJSONClient) DeployAgent(ctx context.Context, in *DeployAgentR
 
 func (c *cloudAgentJSONClient) callDeployAgent(ctx context.Context, in *DeployAgentRequest) (*DeployAgentResponse, error) {
 	out := new(DeployAgentResponse)
-	ctx, err := doJSONRequest(ctx, c.client, c.opts.Hooks, c.urls[6], in, out)
+	ctx, err := doJSONRequest(ctx, c.client, c.opts.Hooks, c.urls[8], in, out)
+	if err != nil {
+		twerr, ok := err.(twirp.Error)
+		if !ok {
+			twerr = twirp.InternalErrorWith(err)
+		}
+		callClientError(ctx, c.opts.Hooks, twerr)
+		return nil, err
+	}
+
+	callClientResponseReceived(ctx, c.opts.Hooks)
+
+	return out, nil
+}
+
+func (c *cloudAgentJSONClient) DeployAgentV2(ctx context.Context, in *DeployAgentV2Request) (*DeployAgentV2Response, error) {
+	ctx = ctxsetters.WithPackageName(ctx, "livekit")
+	ctx = ctxsetters.WithServiceName(ctx, "CloudAgent")
+	ctx = ctxsetters.WithMethodName(ctx, "DeployAgentV2")
+	caller := c.callDeployAgentV2
+	if c.interceptor != nil {
+		caller = func(ctx context.Context, req *DeployAgentV2Request) (*DeployAgentV2Response, error) {
+			resp, err := c.interceptor(
+				func(ctx context.Context, req interface{}) (interface{}, error) {
+					typedReq, ok := req.(*DeployAgentV2Request)
+					if !ok {
+						return nil, twirp.InternalError("failed type assertion req.(*DeployAgentV2Request) when calling interceptor")
+					}
+					return c.callDeployAgentV2(ctx, typedReq)
+				},
+			)(ctx, req)
+			if resp != nil {
+				typedResp, ok := resp.(*DeployAgentV2Response)
+				if !ok {
+					return nil, twirp.InternalError("failed type assertion resp.(*DeployAgentV2Response) when calling interceptor")
+				}
+				return typedResp, err
+			}
+			return nil, err
+		}
+	}
+	return caller(ctx, in)
+}
+
+func (c *cloudAgentJSONClient) callDeployAgentV2(ctx context.Context, in *DeployAgentV2Request) (*DeployAgentV2Response, error) {
+	out := new(DeployAgentV2Response)
+	ctx, err := doJSONRequest(ctx, c.client, c.opts.Hooks, c.urls[9], in, out)
 	if err != nil {
 		twerr, ok := err.(twirp.Error)
 		if !ok {
@@ -1021,7 +1509,7 @@ func (c *cloudAgentJSONClient) UpdateAgentSecrets(ctx context.Context, in *Updat
 
 func (c *cloudAgentJSONClient) callUpdateAgentSecrets(ctx context.Context, in *UpdateAgentSecretsRequest) (*UpdateAgentSecretsResponse, error) {
 	out := new(UpdateAgentSecretsResponse)
-	ctx, err := doJSONRequest(ctx, c.client, c.opts.Hooks, c.urls[7], in, out)
+	ctx, err := doJSONRequest(ctx, c.client, c.opts.Hooks, c.urls[10], in, out)
 	if err != nil {
 		twerr, ok := err.(twirp.Error)
 		if !ok {
@@ -1067,7 +1555,7 @@ func (c *cloudAgentJSONClient) RollbackAgent(ctx context.Context, in *RollbackAg
 
 func (c *cloudAgentJSONClient) callRollbackAgent(ctx context.Context, in *RollbackAgentRequest) (*RollbackAgentResponse, error) {
 	out := new(RollbackAgentResponse)
-	ctx, err := doJSONRequest(ctx, c.client, c.opts.Hooks, c.urls[8], in, out)
+	ctx, err := doJSONRequest(ctx, c.client, c.opts.Hooks, c.urls[11], in, out)
 	if err != nil {
 		twerr, ok := err.(twirp.Error)
 		if !ok {
@@ -1113,7 +1601,7 @@ func (c *cloudAgentJSONClient) DeleteAgent(ctx context.Context, in *DeleteAgentR
 
 func (c *cloudAgentJSONClient) callDeleteAgent(ctx context.Context, in *DeleteAgentRequest) (*DeleteAgentResponse, error) {
 	out := new(DeleteAgentResponse)
-	ctx, err := doJSONRequest(ctx, c.client, c.opts.Hooks, c.urls[9], in, out)
+	ctx, err := doJSONRequest(ctx, c.client, c.opts.Hooks, c.urls[12], in, out)
 	if err != nil {
 		twerr, ok := err.(twirp.Error)
 		if !ok {
@@ -1159,7 +1647,191 @@ func (c *cloudAgentJSONClient) GetClientSettings(ctx context.Context, in *Client
 
 func (c *cloudAgentJSONClient) callGetClientSettings(ctx context.Context, in *ClientSettingsRequest) (*ClientSettingsResponse, error) {
 	out := new(ClientSettingsResponse)
-	ctx, err := doJSONRequest(ctx, c.client, c.opts.Hooks, c.urls[10], in, out)
+	ctx, err := doJSONRequest(ctx, c.client, c.opts.Hooks, c.urls[13], in, out)
+	if err != nil {
+		twerr, ok := err.(twirp.Error)
+		if !ok {
+			twerr = twirp.InternalErrorWith(err)
+		}
+		callClientError(ctx, c.opts.Hooks, twerr)
+		return nil, err
+	}
+
+	callClientResponseReceived(ctx, c.opts.Hooks)
+
+	return out, nil
+}
+
+func (c *cloudAgentJSONClient) CreatePrivateLink(ctx context.Context, in *CreatePrivateLinkRequest) (*CreatePrivateLinkResponse, error) {
+	ctx = ctxsetters.WithPackageName(ctx, "livekit")
+	ctx = ctxsetters.WithServiceName(ctx, "CloudAgent")
+	ctx = ctxsetters.WithMethodName(ctx, "CreatePrivateLink")
+	caller := c.callCreatePrivateLink
+	if c.interceptor != nil {
+		caller = func(ctx context.Context, req *CreatePrivateLinkRequest) (*CreatePrivateLinkResponse, error) {
+			resp, err := c.interceptor(
+				func(ctx context.Context, req interface{}) (interface{}, error) {
+					typedReq, ok := req.(*CreatePrivateLinkRequest)
+					if !ok {
+						return nil, twirp.InternalError("failed type assertion req.(*CreatePrivateLinkRequest) when calling interceptor")
+					}
+					return c.callCreatePrivateLink(ctx, typedReq)
+				},
+			)(ctx, req)
+			if resp != nil {
+				typedResp, ok := resp.(*CreatePrivateLinkResponse)
+				if !ok {
+					return nil, twirp.InternalError("failed type assertion resp.(*CreatePrivateLinkResponse) when calling interceptor")
+				}
+				return typedResp, err
+			}
+			return nil, err
+		}
+	}
+	return caller(ctx, in)
+}
+
+func (c *cloudAgentJSONClient) callCreatePrivateLink(ctx context.Context, in *CreatePrivateLinkRequest) (*CreatePrivateLinkResponse, error) {
+	out := new(CreatePrivateLinkResponse)
+	ctx, err := doJSONRequest(ctx, c.client, c.opts.Hooks, c.urls[14], in, out)
+	if err != nil {
+		twerr, ok := err.(twirp.Error)
+		if !ok {
+			twerr = twirp.InternalErrorWith(err)
+		}
+		callClientError(ctx, c.opts.Hooks, twerr)
+		return nil, err
+	}
+
+	callClientResponseReceived(ctx, c.opts.Hooks)
+
+	return out, nil
+}
+
+func (c *cloudAgentJSONClient) DestroyPrivateLink(ctx context.Context, in *DestroyPrivateLinkRequest) (*DestroyPrivateLinkResponse, error) {
+	ctx = ctxsetters.WithPackageName(ctx, "livekit")
+	ctx = ctxsetters.WithServiceName(ctx, "CloudAgent")
+	ctx = ctxsetters.WithMethodName(ctx, "DestroyPrivateLink")
+	caller := c.callDestroyPrivateLink
+	if c.interceptor != nil {
+		caller = func(ctx context.Context, req *DestroyPrivateLinkRequest) (*DestroyPrivateLinkResponse, error) {
+			resp, err := c.interceptor(
+				func(ctx context.Context, req interface{}) (interface{}, error) {
+					typedReq, ok := req.(*DestroyPrivateLinkRequest)
+					if !ok {
+						return nil, twirp.InternalError("failed type assertion req.(*DestroyPrivateLinkRequest) when calling interceptor")
+					}
+					return c.callDestroyPrivateLink(ctx, typedReq)
+				},
+			)(ctx, req)
+			if resp != nil {
+				typedResp, ok := resp.(*DestroyPrivateLinkResponse)
+				if !ok {
+					return nil, twirp.InternalError("failed type assertion resp.(*DestroyPrivateLinkResponse) when calling interceptor")
+				}
+				return typedResp, err
+			}
+			return nil, err
+		}
+	}
+	return caller(ctx, in)
+}
+
+func (c *cloudAgentJSONClient) callDestroyPrivateLink(ctx context.Context, in *DestroyPrivateLinkRequest) (*DestroyPrivateLinkResponse, error) {
+	out := new(DestroyPrivateLinkResponse)
+	ctx, err := doJSONRequest(ctx, c.client, c.opts.Hooks, c.urls[15], in, out)
+	if err != nil {
+		twerr, ok := err.(twirp.Error)
+		if !ok {
+			twerr = twirp.InternalErrorWith(err)
+		}
+		callClientError(ctx, c.opts.Hooks, twerr)
+		return nil, err
+	}
+
+	callClientResponseReceived(ctx, c.opts.Hooks)
+
+	return out, nil
+}
+
+func (c *cloudAgentJSONClient) ListPrivateLinks(ctx context.Context, in *ListPrivateLinksRequest) (*ListPrivateLinksResponse, error) {
+	ctx = ctxsetters.WithPackageName(ctx, "livekit")
+	ctx = ctxsetters.WithServiceName(ctx, "CloudAgent")
+	ctx = ctxsetters.WithMethodName(ctx, "ListPrivateLinks")
+	caller := c.callListPrivateLinks
+	if c.interceptor != nil {
+		caller = func(ctx context.Context, req *ListPrivateLinksRequest) (*ListPrivateLinksResponse, error) {
+			resp, err := c.interceptor(
+				func(ctx context.Context, req interface{}) (interface{}, error) {
+					typedReq, ok := req.(*ListPrivateLinksRequest)
+					if !ok {
+						return nil, twirp.InternalError("failed type assertion req.(*ListPrivateLinksRequest) when calling interceptor")
+					}
+					return c.callListPrivateLinks(ctx, typedReq)
+				},
+			)(ctx, req)
+			if resp != nil {
+				typedResp, ok := resp.(*ListPrivateLinksResponse)
+				if !ok {
+					return nil, twirp.InternalError("failed type assertion resp.(*ListPrivateLinksResponse) when calling interceptor")
+				}
+				return typedResp, err
+			}
+			return nil, err
+		}
+	}
+	return caller(ctx, in)
+}
+
+func (c *cloudAgentJSONClient) callListPrivateLinks(ctx context.Context, in *ListPrivateLinksRequest) (*ListPrivateLinksResponse, error) {
+	out := new(ListPrivateLinksResponse)
+	ctx, err := doJSONRequest(ctx, c.client, c.opts.Hooks, c.urls[16], in, out)
+	if err != nil {
+		twerr, ok := err.(twirp.Error)
+		if !ok {
+			twerr = twirp.InternalErrorWith(err)
+		}
+		callClientError(ctx, c.opts.Hooks, twerr)
+		return nil, err
+	}
+
+	callClientResponseReceived(ctx, c.opts.Hooks)
+
+	return out, nil
+}
+
+func (c *cloudAgentJSONClient) GetPrivateLinkStatus(ctx context.Context, in *GetPrivateLinkStatusRequest) (*GetPrivateLinkStatusResponse, error) {
+	ctx = ctxsetters.WithPackageName(ctx, "livekit")
+	ctx = ctxsetters.WithServiceName(ctx, "CloudAgent")
+	ctx = ctxsetters.WithMethodName(ctx, "GetPrivateLinkStatus")
+	caller := c.callGetPrivateLinkStatus
+	if c.interceptor != nil {
+		caller = func(ctx context.Context, req *GetPrivateLinkStatusRequest) (*GetPrivateLinkStatusResponse, error) {
+			resp, err := c.interceptor(
+				func(ctx context.Context, req interface{}) (interface{}, error) {
+					typedReq, ok := req.(*GetPrivateLinkStatusRequest)
+					if !ok {
+						return nil, twirp.InternalError("failed type assertion req.(*GetPrivateLinkStatusRequest) when calling interceptor")
+					}
+					return c.callGetPrivateLinkStatus(ctx, typedReq)
+				},
+			)(ctx, req)
+			if resp != nil {
+				typedResp, ok := resp.(*GetPrivateLinkStatusResponse)
+				if !ok {
+					return nil, twirp.InternalError("failed type assertion resp.(*GetPrivateLinkStatusResponse) when calling interceptor")
+				}
+				return typedResp, err
+			}
+			return nil, err
+		}
+	}
+	return caller(ctx, in)
+}
+
+func (c *cloudAgentJSONClient) callGetPrivateLinkStatus(ctx context.Context, in *GetPrivateLinkStatusRequest) (*GetPrivateLinkStatusResponse, error) {
+	out := new(GetPrivateLinkStatusResponse)
+	ctx, err := doJSONRequest(ctx, c.client, c.opts.Hooks, c.urls[17], in, out)
 	if err != nil {
 		twerr, ok := err.(twirp.Error)
 		if !ok {
@@ -1274,6 +1946,12 @@ func (s *cloudAgentServer) ServeHTTP(resp http.ResponseWriter, req *http.Request
 	case "CreateAgent":
 		s.serveCreateAgent(ctx, resp, req)
 		return
+	case "CreateAgentV2":
+		s.serveCreateAgentV2(ctx, resp, req)
+		return
+	case "PromoteAgent":
+		s.servePromoteAgent(ctx, resp, req)
+		return
 	case "ListAgents":
 		s.serveListAgents(ctx, resp, req)
 		return
@@ -1292,6 +1970,9 @@ func (s *cloudAgentServer) ServeHTTP(resp http.ResponseWriter, req *http.Request
 	case "DeployAgent":
 		s.serveDeployAgent(ctx, resp, req)
 		return
+	case "DeployAgentV2":
+		s.serveDeployAgentV2(ctx, resp, req)
+		return
 	case "UpdateAgentSecrets":
 		s.serveUpdateAgentSecrets(ctx, resp, req)
 		return
@@ -1303,6 +1984,18 @@ func (s *cloudAgentServer) ServeHTTP(resp http.ResponseWriter, req *http.Request
 		return
 	case "GetClientSettings":
 		s.serveGetClientSettings(ctx, resp, req)
+		return
+	case "CreatePrivateLink":
+		s.serveCreatePrivateLink(ctx, resp, req)
+		return
+	case "DestroyPrivateLink":
+		s.serveDestroyPrivateLink(ctx, resp, req)
+		return
+	case "ListPrivateLinks":
+		s.serveListPrivateLinks(ctx, resp, req)
+		return
+	case "GetPrivateLinkStatus":
+		s.serveGetPrivateLinkStatus(ctx, resp, req)
 		return
 	default:
 		msg := fmt.Sprintf("no handler for path %q", req.URL.Path)
@@ -1468,6 +2161,366 @@ func (s *cloudAgentServer) serveCreateAgentProtobuf(ctx context.Context, resp ht
 	}
 	if respContent == nil {
 		s.writeError(ctx, resp, twirp.InternalError("received a nil *CreateAgentResponse and nil error while calling CreateAgent. nil responses are not supported"))
+		return
+	}
+
+	ctx = callResponsePrepared(ctx, s.hooks)
+
+	respBytes, err := proto.Marshal(respContent)
+	if err != nil {
+		s.writeError(ctx, resp, wrapInternal(err, "failed to marshal proto response"))
+		return
+	}
+
+	ctx = ctxsetters.WithStatusCode(ctx, http.StatusOK)
+	resp.Header().Set("Content-Type", "application/protobuf")
+	resp.Header().Set("Content-Length", strconv.Itoa(len(respBytes)))
+	resp.WriteHeader(http.StatusOK)
+	if n, err := resp.Write(respBytes); err != nil {
+		msg := fmt.Sprintf("failed to write response, %d of %d bytes written: %s", n, len(respBytes), err.Error())
+		twerr := twirp.NewError(twirp.Unknown, msg)
+		ctx = callError(ctx, s.hooks, twerr)
+	}
+	callResponseSent(ctx, s.hooks)
+}
+
+func (s *cloudAgentServer) serveCreateAgentV2(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+	header := req.Header.Get("Content-Type")
+	i := strings.Index(header, ";")
+	if i == -1 {
+		i = len(header)
+	}
+	switch strings.TrimSpace(strings.ToLower(header[:i])) {
+	case "application/json":
+		s.serveCreateAgentV2JSON(ctx, resp, req)
+	case "application/protobuf":
+		s.serveCreateAgentV2Protobuf(ctx, resp, req)
+	default:
+		msg := fmt.Sprintf("unexpected Content-Type: %q", req.Header.Get("Content-Type"))
+		twerr := badRouteError(msg, req.Method, req.URL.Path)
+		s.writeError(ctx, resp, twerr)
+	}
+}
+
+func (s *cloudAgentServer) serveCreateAgentV2JSON(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+	var err error
+	ctx = ctxsetters.WithMethodName(ctx, "CreateAgentV2")
+	ctx, err = callRequestRouted(ctx, s.hooks)
+	if err != nil {
+		s.writeError(ctx, resp, err)
+		return
+	}
+
+	d := json.NewDecoder(req.Body)
+	rawReqBody := json.RawMessage{}
+	if err := d.Decode(&rawReqBody); err != nil {
+		s.handleRequestBodyError(ctx, resp, "the json request could not be decoded", err)
+		return
+	}
+	reqContent := new(CreateAgentV2Request)
+	unmarshaler := protojson.UnmarshalOptions{DiscardUnknown: true}
+	if err = unmarshaler.Unmarshal(rawReqBody, reqContent); err != nil {
+		s.handleRequestBodyError(ctx, resp, "the json request could not be decoded", err)
+		return
+	}
+
+	handler := s.CloudAgent.CreateAgentV2
+	if s.interceptor != nil {
+		handler = func(ctx context.Context, req *CreateAgentV2Request) (*CreateAgentV2Response, error) {
+			resp, err := s.interceptor(
+				func(ctx context.Context, req interface{}) (interface{}, error) {
+					typedReq, ok := req.(*CreateAgentV2Request)
+					if !ok {
+						return nil, twirp.InternalError("failed type assertion req.(*CreateAgentV2Request) when calling interceptor")
+					}
+					return s.CloudAgent.CreateAgentV2(ctx, typedReq)
+				},
+			)(ctx, req)
+			if resp != nil {
+				typedResp, ok := resp.(*CreateAgentV2Response)
+				if !ok {
+					return nil, twirp.InternalError("failed type assertion resp.(*CreateAgentV2Response) when calling interceptor")
+				}
+				return typedResp, err
+			}
+			return nil, err
+		}
+	}
+
+	// Call service method
+	var respContent *CreateAgentV2Response
+	func() {
+		defer ensurePanicResponses(ctx, resp, s.hooks)
+		respContent, err = handler(ctx, reqContent)
+	}()
+
+	if err != nil {
+		s.writeError(ctx, resp, err)
+		return
+	}
+	if respContent == nil {
+		s.writeError(ctx, resp, twirp.InternalError("received a nil *CreateAgentV2Response and nil error while calling CreateAgentV2. nil responses are not supported"))
+		return
+	}
+
+	ctx = callResponsePrepared(ctx, s.hooks)
+
+	marshaler := &protojson.MarshalOptions{UseProtoNames: !s.jsonCamelCase, EmitUnpopulated: !s.jsonSkipDefaults}
+	respBytes, err := marshaler.Marshal(respContent)
+	if err != nil {
+		s.writeError(ctx, resp, wrapInternal(err, "failed to marshal json response"))
+		return
+	}
+
+	ctx = ctxsetters.WithStatusCode(ctx, http.StatusOK)
+	resp.Header().Set("Content-Type", "application/json")
+	resp.Header().Set("Content-Length", strconv.Itoa(len(respBytes)))
+	resp.WriteHeader(http.StatusOK)
+
+	if n, err := resp.Write(respBytes); err != nil {
+		msg := fmt.Sprintf("failed to write response, %d of %d bytes written: %s", n, len(respBytes), err.Error())
+		twerr := twirp.NewError(twirp.Unknown, msg)
+		ctx = callError(ctx, s.hooks, twerr)
+	}
+	callResponseSent(ctx, s.hooks)
+}
+
+func (s *cloudAgentServer) serveCreateAgentV2Protobuf(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+	var err error
+	ctx = ctxsetters.WithMethodName(ctx, "CreateAgentV2")
+	ctx, err = callRequestRouted(ctx, s.hooks)
+	if err != nil {
+		s.writeError(ctx, resp, err)
+		return
+	}
+
+	buf, err := io.ReadAll(req.Body)
+	if err != nil {
+		s.handleRequestBodyError(ctx, resp, "failed to read request body", err)
+		return
+	}
+	reqContent := new(CreateAgentV2Request)
+	if err = proto.Unmarshal(buf, reqContent); err != nil {
+		s.writeError(ctx, resp, malformedRequestError("the protobuf request could not be decoded"))
+		return
+	}
+
+	handler := s.CloudAgent.CreateAgentV2
+	if s.interceptor != nil {
+		handler = func(ctx context.Context, req *CreateAgentV2Request) (*CreateAgentV2Response, error) {
+			resp, err := s.interceptor(
+				func(ctx context.Context, req interface{}) (interface{}, error) {
+					typedReq, ok := req.(*CreateAgentV2Request)
+					if !ok {
+						return nil, twirp.InternalError("failed type assertion req.(*CreateAgentV2Request) when calling interceptor")
+					}
+					return s.CloudAgent.CreateAgentV2(ctx, typedReq)
+				},
+			)(ctx, req)
+			if resp != nil {
+				typedResp, ok := resp.(*CreateAgentV2Response)
+				if !ok {
+					return nil, twirp.InternalError("failed type assertion resp.(*CreateAgentV2Response) when calling interceptor")
+				}
+				return typedResp, err
+			}
+			return nil, err
+		}
+	}
+
+	// Call service method
+	var respContent *CreateAgentV2Response
+	func() {
+		defer ensurePanicResponses(ctx, resp, s.hooks)
+		respContent, err = handler(ctx, reqContent)
+	}()
+
+	if err != nil {
+		s.writeError(ctx, resp, err)
+		return
+	}
+	if respContent == nil {
+		s.writeError(ctx, resp, twirp.InternalError("received a nil *CreateAgentV2Response and nil error while calling CreateAgentV2. nil responses are not supported"))
+		return
+	}
+
+	ctx = callResponsePrepared(ctx, s.hooks)
+
+	respBytes, err := proto.Marshal(respContent)
+	if err != nil {
+		s.writeError(ctx, resp, wrapInternal(err, "failed to marshal proto response"))
+		return
+	}
+
+	ctx = ctxsetters.WithStatusCode(ctx, http.StatusOK)
+	resp.Header().Set("Content-Type", "application/protobuf")
+	resp.Header().Set("Content-Length", strconv.Itoa(len(respBytes)))
+	resp.WriteHeader(http.StatusOK)
+	if n, err := resp.Write(respBytes); err != nil {
+		msg := fmt.Sprintf("failed to write response, %d of %d bytes written: %s", n, len(respBytes), err.Error())
+		twerr := twirp.NewError(twirp.Unknown, msg)
+		ctx = callError(ctx, s.hooks, twerr)
+	}
+	callResponseSent(ctx, s.hooks)
+}
+
+func (s *cloudAgentServer) servePromoteAgent(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+	header := req.Header.Get("Content-Type")
+	i := strings.Index(header, ";")
+	if i == -1 {
+		i = len(header)
+	}
+	switch strings.TrimSpace(strings.ToLower(header[:i])) {
+	case "application/json":
+		s.servePromoteAgentJSON(ctx, resp, req)
+	case "application/protobuf":
+		s.servePromoteAgentProtobuf(ctx, resp, req)
+	default:
+		msg := fmt.Sprintf("unexpected Content-Type: %q", req.Header.Get("Content-Type"))
+		twerr := badRouteError(msg, req.Method, req.URL.Path)
+		s.writeError(ctx, resp, twerr)
+	}
+}
+
+func (s *cloudAgentServer) servePromoteAgentJSON(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+	var err error
+	ctx = ctxsetters.WithMethodName(ctx, "PromoteAgent")
+	ctx, err = callRequestRouted(ctx, s.hooks)
+	if err != nil {
+		s.writeError(ctx, resp, err)
+		return
+	}
+
+	d := json.NewDecoder(req.Body)
+	rawReqBody := json.RawMessage{}
+	if err := d.Decode(&rawReqBody); err != nil {
+		s.handleRequestBodyError(ctx, resp, "the json request could not be decoded", err)
+		return
+	}
+	reqContent := new(PromoteAgentRequest)
+	unmarshaler := protojson.UnmarshalOptions{DiscardUnknown: true}
+	if err = unmarshaler.Unmarshal(rawReqBody, reqContent); err != nil {
+		s.handleRequestBodyError(ctx, resp, "the json request could not be decoded", err)
+		return
+	}
+
+	handler := s.CloudAgent.PromoteAgent
+	if s.interceptor != nil {
+		handler = func(ctx context.Context, req *PromoteAgentRequest) (*PromoteAgentResponse, error) {
+			resp, err := s.interceptor(
+				func(ctx context.Context, req interface{}) (interface{}, error) {
+					typedReq, ok := req.(*PromoteAgentRequest)
+					if !ok {
+						return nil, twirp.InternalError("failed type assertion req.(*PromoteAgentRequest) when calling interceptor")
+					}
+					return s.CloudAgent.PromoteAgent(ctx, typedReq)
+				},
+			)(ctx, req)
+			if resp != nil {
+				typedResp, ok := resp.(*PromoteAgentResponse)
+				if !ok {
+					return nil, twirp.InternalError("failed type assertion resp.(*PromoteAgentResponse) when calling interceptor")
+				}
+				return typedResp, err
+			}
+			return nil, err
+		}
+	}
+
+	// Call service method
+	var respContent *PromoteAgentResponse
+	func() {
+		defer ensurePanicResponses(ctx, resp, s.hooks)
+		respContent, err = handler(ctx, reqContent)
+	}()
+
+	if err != nil {
+		s.writeError(ctx, resp, err)
+		return
+	}
+	if respContent == nil {
+		s.writeError(ctx, resp, twirp.InternalError("received a nil *PromoteAgentResponse and nil error while calling PromoteAgent. nil responses are not supported"))
+		return
+	}
+
+	ctx = callResponsePrepared(ctx, s.hooks)
+
+	marshaler := &protojson.MarshalOptions{UseProtoNames: !s.jsonCamelCase, EmitUnpopulated: !s.jsonSkipDefaults}
+	respBytes, err := marshaler.Marshal(respContent)
+	if err != nil {
+		s.writeError(ctx, resp, wrapInternal(err, "failed to marshal json response"))
+		return
+	}
+
+	ctx = ctxsetters.WithStatusCode(ctx, http.StatusOK)
+	resp.Header().Set("Content-Type", "application/json")
+	resp.Header().Set("Content-Length", strconv.Itoa(len(respBytes)))
+	resp.WriteHeader(http.StatusOK)
+
+	if n, err := resp.Write(respBytes); err != nil {
+		msg := fmt.Sprintf("failed to write response, %d of %d bytes written: %s", n, len(respBytes), err.Error())
+		twerr := twirp.NewError(twirp.Unknown, msg)
+		ctx = callError(ctx, s.hooks, twerr)
+	}
+	callResponseSent(ctx, s.hooks)
+}
+
+func (s *cloudAgentServer) servePromoteAgentProtobuf(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+	var err error
+	ctx = ctxsetters.WithMethodName(ctx, "PromoteAgent")
+	ctx, err = callRequestRouted(ctx, s.hooks)
+	if err != nil {
+		s.writeError(ctx, resp, err)
+		return
+	}
+
+	buf, err := io.ReadAll(req.Body)
+	if err != nil {
+		s.handleRequestBodyError(ctx, resp, "failed to read request body", err)
+		return
+	}
+	reqContent := new(PromoteAgentRequest)
+	if err = proto.Unmarshal(buf, reqContent); err != nil {
+		s.writeError(ctx, resp, malformedRequestError("the protobuf request could not be decoded"))
+		return
+	}
+
+	handler := s.CloudAgent.PromoteAgent
+	if s.interceptor != nil {
+		handler = func(ctx context.Context, req *PromoteAgentRequest) (*PromoteAgentResponse, error) {
+			resp, err := s.interceptor(
+				func(ctx context.Context, req interface{}) (interface{}, error) {
+					typedReq, ok := req.(*PromoteAgentRequest)
+					if !ok {
+						return nil, twirp.InternalError("failed type assertion req.(*PromoteAgentRequest) when calling interceptor")
+					}
+					return s.CloudAgent.PromoteAgent(ctx, typedReq)
+				},
+			)(ctx, req)
+			if resp != nil {
+				typedResp, ok := resp.(*PromoteAgentResponse)
+				if !ok {
+					return nil, twirp.InternalError("failed type assertion resp.(*PromoteAgentResponse) when calling interceptor")
+				}
+				return typedResp, err
+			}
+			return nil, err
+		}
+	}
+
+	// Call service method
+	var respContent *PromoteAgentResponse
+	func() {
+		defer ensurePanicResponses(ctx, resp, s.hooks)
+		respContent, err = handler(ctx, reqContent)
+	}()
+
+	if err != nil {
+		s.writeError(ctx, resp, err)
+		return
+	}
+	if respContent == nil {
+		s.writeError(ctx, resp, twirp.InternalError("received a nil *PromoteAgentResponse and nil error while calling PromoteAgent. nil responses are not supported"))
 		return
 	}
 
@@ -2571,6 +3624,186 @@ func (s *cloudAgentServer) serveDeployAgentProtobuf(ctx context.Context, resp ht
 	callResponseSent(ctx, s.hooks)
 }
 
+func (s *cloudAgentServer) serveDeployAgentV2(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+	header := req.Header.Get("Content-Type")
+	i := strings.Index(header, ";")
+	if i == -1 {
+		i = len(header)
+	}
+	switch strings.TrimSpace(strings.ToLower(header[:i])) {
+	case "application/json":
+		s.serveDeployAgentV2JSON(ctx, resp, req)
+	case "application/protobuf":
+		s.serveDeployAgentV2Protobuf(ctx, resp, req)
+	default:
+		msg := fmt.Sprintf("unexpected Content-Type: %q", req.Header.Get("Content-Type"))
+		twerr := badRouteError(msg, req.Method, req.URL.Path)
+		s.writeError(ctx, resp, twerr)
+	}
+}
+
+func (s *cloudAgentServer) serveDeployAgentV2JSON(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+	var err error
+	ctx = ctxsetters.WithMethodName(ctx, "DeployAgentV2")
+	ctx, err = callRequestRouted(ctx, s.hooks)
+	if err != nil {
+		s.writeError(ctx, resp, err)
+		return
+	}
+
+	d := json.NewDecoder(req.Body)
+	rawReqBody := json.RawMessage{}
+	if err := d.Decode(&rawReqBody); err != nil {
+		s.handleRequestBodyError(ctx, resp, "the json request could not be decoded", err)
+		return
+	}
+	reqContent := new(DeployAgentV2Request)
+	unmarshaler := protojson.UnmarshalOptions{DiscardUnknown: true}
+	if err = unmarshaler.Unmarshal(rawReqBody, reqContent); err != nil {
+		s.handleRequestBodyError(ctx, resp, "the json request could not be decoded", err)
+		return
+	}
+
+	handler := s.CloudAgent.DeployAgentV2
+	if s.interceptor != nil {
+		handler = func(ctx context.Context, req *DeployAgentV2Request) (*DeployAgentV2Response, error) {
+			resp, err := s.interceptor(
+				func(ctx context.Context, req interface{}) (interface{}, error) {
+					typedReq, ok := req.(*DeployAgentV2Request)
+					if !ok {
+						return nil, twirp.InternalError("failed type assertion req.(*DeployAgentV2Request) when calling interceptor")
+					}
+					return s.CloudAgent.DeployAgentV2(ctx, typedReq)
+				},
+			)(ctx, req)
+			if resp != nil {
+				typedResp, ok := resp.(*DeployAgentV2Response)
+				if !ok {
+					return nil, twirp.InternalError("failed type assertion resp.(*DeployAgentV2Response) when calling interceptor")
+				}
+				return typedResp, err
+			}
+			return nil, err
+		}
+	}
+
+	// Call service method
+	var respContent *DeployAgentV2Response
+	func() {
+		defer ensurePanicResponses(ctx, resp, s.hooks)
+		respContent, err = handler(ctx, reqContent)
+	}()
+
+	if err != nil {
+		s.writeError(ctx, resp, err)
+		return
+	}
+	if respContent == nil {
+		s.writeError(ctx, resp, twirp.InternalError("received a nil *DeployAgentV2Response and nil error while calling DeployAgentV2. nil responses are not supported"))
+		return
+	}
+
+	ctx = callResponsePrepared(ctx, s.hooks)
+
+	marshaler := &protojson.MarshalOptions{UseProtoNames: !s.jsonCamelCase, EmitUnpopulated: !s.jsonSkipDefaults}
+	respBytes, err := marshaler.Marshal(respContent)
+	if err != nil {
+		s.writeError(ctx, resp, wrapInternal(err, "failed to marshal json response"))
+		return
+	}
+
+	ctx = ctxsetters.WithStatusCode(ctx, http.StatusOK)
+	resp.Header().Set("Content-Type", "application/json")
+	resp.Header().Set("Content-Length", strconv.Itoa(len(respBytes)))
+	resp.WriteHeader(http.StatusOK)
+
+	if n, err := resp.Write(respBytes); err != nil {
+		msg := fmt.Sprintf("failed to write response, %d of %d bytes written: %s", n, len(respBytes), err.Error())
+		twerr := twirp.NewError(twirp.Unknown, msg)
+		ctx = callError(ctx, s.hooks, twerr)
+	}
+	callResponseSent(ctx, s.hooks)
+}
+
+func (s *cloudAgentServer) serveDeployAgentV2Protobuf(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+	var err error
+	ctx = ctxsetters.WithMethodName(ctx, "DeployAgentV2")
+	ctx, err = callRequestRouted(ctx, s.hooks)
+	if err != nil {
+		s.writeError(ctx, resp, err)
+		return
+	}
+
+	buf, err := io.ReadAll(req.Body)
+	if err != nil {
+		s.handleRequestBodyError(ctx, resp, "failed to read request body", err)
+		return
+	}
+	reqContent := new(DeployAgentV2Request)
+	if err = proto.Unmarshal(buf, reqContent); err != nil {
+		s.writeError(ctx, resp, malformedRequestError("the protobuf request could not be decoded"))
+		return
+	}
+
+	handler := s.CloudAgent.DeployAgentV2
+	if s.interceptor != nil {
+		handler = func(ctx context.Context, req *DeployAgentV2Request) (*DeployAgentV2Response, error) {
+			resp, err := s.interceptor(
+				func(ctx context.Context, req interface{}) (interface{}, error) {
+					typedReq, ok := req.(*DeployAgentV2Request)
+					if !ok {
+						return nil, twirp.InternalError("failed type assertion req.(*DeployAgentV2Request) when calling interceptor")
+					}
+					return s.CloudAgent.DeployAgentV2(ctx, typedReq)
+				},
+			)(ctx, req)
+			if resp != nil {
+				typedResp, ok := resp.(*DeployAgentV2Response)
+				if !ok {
+					return nil, twirp.InternalError("failed type assertion resp.(*DeployAgentV2Response) when calling interceptor")
+				}
+				return typedResp, err
+			}
+			return nil, err
+		}
+	}
+
+	// Call service method
+	var respContent *DeployAgentV2Response
+	func() {
+		defer ensurePanicResponses(ctx, resp, s.hooks)
+		respContent, err = handler(ctx, reqContent)
+	}()
+
+	if err != nil {
+		s.writeError(ctx, resp, err)
+		return
+	}
+	if respContent == nil {
+		s.writeError(ctx, resp, twirp.InternalError("received a nil *DeployAgentV2Response and nil error while calling DeployAgentV2. nil responses are not supported"))
+		return
+	}
+
+	ctx = callResponsePrepared(ctx, s.hooks)
+
+	respBytes, err := proto.Marshal(respContent)
+	if err != nil {
+		s.writeError(ctx, resp, wrapInternal(err, "failed to marshal proto response"))
+		return
+	}
+
+	ctx = ctxsetters.WithStatusCode(ctx, http.StatusOK)
+	resp.Header().Set("Content-Type", "application/protobuf")
+	resp.Header().Set("Content-Length", strconv.Itoa(len(respBytes)))
+	resp.WriteHeader(http.StatusOK)
+	if n, err := resp.Write(respBytes); err != nil {
+		msg := fmt.Sprintf("failed to write response, %d of %d bytes written: %s", n, len(respBytes), err.Error())
+		twerr := twirp.NewError(twirp.Unknown, msg)
+		ctx = callError(ctx, s.hooks, twerr)
+	}
+	callResponseSent(ctx, s.hooks)
+}
+
 func (s *cloudAgentServer) serveUpdateAgentSecrets(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
 	header := req.Header.Get("Content-Type")
 	i := strings.Index(header, ";")
@@ -3291,8 +4524,728 @@ func (s *cloudAgentServer) serveGetClientSettingsProtobuf(ctx context.Context, r
 	callResponseSent(ctx, s.hooks)
 }
 
+func (s *cloudAgentServer) serveCreatePrivateLink(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+	header := req.Header.Get("Content-Type")
+	i := strings.Index(header, ";")
+	if i == -1 {
+		i = len(header)
+	}
+	switch strings.TrimSpace(strings.ToLower(header[:i])) {
+	case "application/json":
+		s.serveCreatePrivateLinkJSON(ctx, resp, req)
+	case "application/protobuf":
+		s.serveCreatePrivateLinkProtobuf(ctx, resp, req)
+	default:
+		msg := fmt.Sprintf("unexpected Content-Type: %q", req.Header.Get("Content-Type"))
+		twerr := badRouteError(msg, req.Method, req.URL.Path)
+		s.writeError(ctx, resp, twerr)
+	}
+}
+
+func (s *cloudAgentServer) serveCreatePrivateLinkJSON(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+	var err error
+	ctx = ctxsetters.WithMethodName(ctx, "CreatePrivateLink")
+	ctx, err = callRequestRouted(ctx, s.hooks)
+	if err != nil {
+		s.writeError(ctx, resp, err)
+		return
+	}
+
+	d := json.NewDecoder(req.Body)
+	rawReqBody := json.RawMessage{}
+	if err := d.Decode(&rawReqBody); err != nil {
+		s.handleRequestBodyError(ctx, resp, "the json request could not be decoded", err)
+		return
+	}
+	reqContent := new(CreatePrivateLinkRequest)
+	unmarshaler := protojson.UnmarshalOptions{DiscardUnknown: true}
+	if err = unmarshaler.Unmarshal(rawReqBody, reqContent); err != nil {
+		s.handleRequestBodyError(ctx, resp, "the json request could not be decoded", err)
+		return
+	}
+
+	handler := s.CloudAgent.CreatePrivateLink
+	if s.interceptor != nil {
+		handler = func(ctx context.Context, req *CreatePrivateLinkRequest) (*CreatePrivateLinkResponse, error) {
+			resp, err := s.interceptor(
+				func(ctx context.Context, req interface{}) (interface{}, error) {
+					typedReq, ok := req.(*CreatePrivateLinkRequest)
+					if !ok {
+						return nil, twirp.InternalError("failed type assertion req.(*CreatePrivateLinkRequest) when calling interceptor")
+					}
+					return s.CloudAgent.CreatePrivateLink(ctx, typedReq)
+				},
+			)(ctx, req)
+			if resp != nil {
+				typedResp, ok := resp.(*CreatePrivateLinkResponse)
+				if !ok {
+					return nil, twirp.InternalError("failed type assertion resp.(*CreatePrivateLinkResponse) when calling interceptor")
+				}
+				return typedResp, err
+			}
+			return nil, err
+		}
+	}
+
+	// Call service method
+	var respContent *CreatePrivateLinkResponse
+	func() {
+		defer ensurePanicResponses(ctx, resp, s.hooks)
+		respContent, err = handler(ctx, reqContent)
+	}()
+
+	if err != nil {
+		s.writeError(ctx, resp, err)
+		return
+	}
+	if respContent == nil {
+		s.writeError(ctx, resp, twirp.InternalError("received a nil *CreatePrivateLinkResponse and nil error while calling CreatePrivateLink. nil responses are not supported"))
+		return
+	}
+
+	ctx = callResponsePrepared(ctx, s.hooks)
+
+	marshaler := &protojson.MarshalOptions{UseProtoNames: !s.jsonCamelCase, EmitUnpopulated: !s.jsonSkipDefaults}
+	respBytes, err := marshaler.Marshal(respContent)
+	if err != nil {
+		s.writeError(ctx, resp, wrapInternal(err, "failed to marshal json response"))
+		return
+	}
+
+	ctx = ctxsetters.WithStatusCode(ctx, http.StatusOK)
+	resp.Header().Set("Content-Type", "application/json")
+	resp.Header().Set("Content-Length", strconv.Itoa(len(respBytes)))
+	resp.WriteHeader(http.StatusOK)
+
+	if n, err := resp.Write(respBytes); err != nil {
+		msg := fmt.Sprintf("failed to write response, %d of %d bytes written: %s", n, len(respBytes), err.Error())
+		twerr := twirp.NewError(twirp.Unknown, msg)
+		ctx = callError(ctx, s.hooks, twerr)
+	}
+	callResponseSent(ctx, s.hooks)
+}
+
+func (s *cloudAgentServer) serveCreatePrivateLinkProtobuf(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+	var err error
+	ctx = ctxsetters.WithMethodName(ctx, "CreatePrivateLink")
+	ctx, err = callRequestRouted(ctx, s.hooks)
+	if err != nil {
+		s.writeError(ctx, resp, err)
+		return
+	}
+
+	buf, err := io.ReadAll(req.Body)
+	if err != nil {
+		s.handleRequestBodyError(ctx, resp, "failed to read request body", err)
+		return
+	}
+	reqContent := new(CreatePrivateLinkRequest)
+	if err = proto.Unmarshal(buf, reqContent); err != nil {
+		s.writeError(ctx, resp, malformedRequestError("the protobuf request could not be decoded"))
+		return
+	}
+
+	handler := s.CloudAgent.CreatePrivateLink
+	if s.interceptor != nil {
+		handler = func(ctx context.Context, req *CreatePrivateLinkRequest) (*CreatePrivateLinkResponse, error) {
+			resp, err := s.interceptor(
+				func(ctx context.Context, req interface{}) (interface{}, error) {
+					typedReq, ok := req.(*CreatePrivateLinkRequest)
+					if !ok {
+						return nil, twirp.InternalError("failed type assertion req.(*CreatePrivateLinkRequest) when calling interceptor")
+					}
+					return s.CloudAgent.CreatePrivateLink(ctx, typedReq)
+				},
+			)(ctx, req)
+			if resp != nil {
+				typedResp, ok := resp.(*CreatePrivateLinkResponse)
+				if !ok {
+					return nil, twirp.InternalError("failed type assertion resp.(*CreatePrivateLinkResponse) when calling interceptor")
+				}
+				return typedResp, err
+			}
+			return nil, err
+		}
+	}
+
+	// Call service method
+	var respContent *CreatePrivateLinkResponse
+	func() {
+		defer ensurePanicResponses(ctx, resp, s.hooks)
+		respContent, err = handler(ctx, reqContent)
+	}()
+
+	if err != nil {
+		s.writeError(ctx, resp, err)
+		return
+	}
+	if respContent == nil {
+		s.writeError(ctx, resp, twirp.InternalError("received a nil *CreatePrivateLinkResponse and nil error while calling CreatePrivateLink. nil responses are not supported"))
+		return
+	}
+
+	ctx = callResponsePrepared(ctx, s.hooks)
+
+	respBytes, err := proto.Marshal(respContent)
+	if err != nil {
+		s.writeError(ctx, resp, wrapInternal(err, "failed to marshal proto response"))
+		return
+	}
+
+	ctx = ctxsetters.WithStatusCode(ctx, http.StatusOK)
+	resp.Header().Set("Content-Type", "application/protobuf")
+	resp.Header().Set("Content-Length", strconv.Itoa(len(respBytes)))
+	resp.WriteHeader(http.StatusOK)
+	if n, err := resp.Write(respBytes); err != nil {
+		msg := fmt.Sprintf("failed to write response, %d of %d bytes written: %s", n, len(respBytes), err.Error())
+		twerr := twirp.NewError(twirp.Unknown, msg)
+		ctx = callError(ctx, s.hooks, twerr)
+	}
+	callResponseSent(ctx, s.hooks)
+}
+
+func (s *cloudAgentServer) serveDestroyPrivateLink(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+	header := req.Header.Get("Content-Type")
+	i := strings.Index(header, ";")
+	if i == -1 {
+		i = len(header)
+	}
+	switch strings.TrimSpace(strings.ToLower(header[:i])) {
+	case "application/json":
+		s.serveDestroyPrivateLinkJSON(ctx, resp, req)
+	case "application/protobuf":
+		s.serveDestroyPrivateLinkProtobuf(ctx, resp, req)
+	default:
+		msg := fmt.Sprintf("unexpected Content-Type: %q", req.Header.Get("Content-Type"))
+		twerr := badRouteError(msg, req.Method, req.URL.Path)
+		s.writeError(ctx, resp, twerr)
+	}
+}
+
+func (s *cloudAgentServer) serveDestroyPrivateLinkJSON(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+	var err error
+	ctx = ctxsetters.WithMethodName(ctx, "DestroyPrivateLink")
+	ctx, err = callRequestRouted(ctx, s.hooks)
+	if err != nil {
+		s.writeError(ctx, resp, err)
+		return
+	}
+
+	d := json.NewDecoder(req.Body)
+	rawReqBody := json.RawMessage{}
+	if err := d.Decode(&rawReqBody); err != nil {
+		s.handleRequestBodyError(ctx, resp, "the json request could not be decoded", err)
+		return
+	}
+	reqContent := new(DestroyPrivateLinkRequest)
+	unmarshaler := protojson.UnmarshalOptions{DiscardUnknown: true}
+	if err = unmarshaler.Unmarshal(rawReqBody, reqContent); err != nil {
+		s.handleRequestBodyError(ctx, resp, "the json request could not be decoded", err)
+		return
+	}
+
+	handler := s.CloudAgent.DestroyPrivateLink
+	if s.interceptor != nil {
+		handler = func(ctx context.Context, req *DestroyPrivateLinkRequest) (*DestroyPrivateLinkResponse, error) {
+			resp, err := s.interceptor(
+				func(ctx context.Context, req interface{}) (interface{}, error) {
+					typedReq, ok := req.(*DestroyPrivateLinkRequest)
+					if !ok {
+						return nil, twirp.InternalError("failed type assertion req.(*DestroyPrivateLinkRequest) when calling interceptor")
+					}
+					return s.CloudAgent.DestroyPrivateLink(ctx, typedReq)
+				},
+			)(ctx, req)
+			if resp != nil {
+				typedResp, ok := resp.(*DestroyPrivateLinkResponse)
+				if !ok {
+					return nil, twirp.InternalError("failed type assertion resp.(*DestroyPrivateLinkResponse) when calling interceptor")
+				}
+				return typedResp, err
+			}
+			return nil, err
+		}
+	}
+
+	// Call service method
+	var respContent *DestroyPrivateLinkResponse
+	func() {
+		defer ensurePanicResponses(ctx, resp, s.hooks)
+		respContent, err = handler(ctx, reqContent)
+	}()
+
+	if err != nil {
+		s.writeError(ctx, resp, err)
+		return
+	}
+	if respContent == nil {
+		s.writeError(ctx, resp, twirp.InternalError("received a nil *DestroyPrivateLinkResponse and nil error while calling DestroyPrivateLink. nil responses are not supported"))
+		return
+	}
+
+	ctx = callResponsePrepared(ctx, s.hooks)
+
+	marshaler := &protojson.MarshalOptions{UseProtoNames: !s.jsonCamelCase, EmitUnpopulated: !s.jsonSkipDefaults}
+	respBytes, err := marshaler.Marshal(respContent)
+	if err != nil {
+		s.writeError(ctx, resp, wrapInternal(err, "failed to marshal json response"))
+		return
+	}
+
+	ctx = ctxsetters.WithStatusCode(ctx, http.StatusOK)
+	resp.Header().Set("Content-Type", "application/json")
+	resp.Header().Set("Content-Length", strconv.Itoa(len(respBytes)))
+	resp.WriteHeader(http.StatusOK)
+
+	if n, err := resp.Write(respBytes); err != nil {
+		msg := fmt.Sprintf("failed to write response, %d of %d bytes written: %s", n, len(respBytes), err.Error())
+		twerr := twirp.NewError(twirp.Unknown, msg)
+		ctx = callError(ctx, s.hooks, twerr)
+	}
+	callResponseSent(ctx, s.hooks)
+}
+
+func (s *cloudAgentServer) serveDestroyPrivateLinkProtobuf(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+	var err error
+	ctx = ctxsetters.WithMethodName(ctx, "DestroyPrivateLink")
+	ctx, err = callRequestRouted(ctx, s.hooks)
+	if err != nil {
+		s.writeError(ctx, resp, err)
+		return
+	}
+
+	buf, err := io.ReadAll(req.Body)
+	if err != nil {
+		s.handleRequestBodyError(ctx, resp, "failed to read request body", err)
+		return
+	}
+	reqContent := new(DestroyPrivateLinkRequest)
+	if err = proto.Unmarshal(buf, reqContent); err != nil {
+		s.writeError(ctx, resp, malformedRequestError("the protobuf request could not be decoded"))
+		return
+	}
+
+	handler := s.CloudAgent.DestroyPrivateLink
+	if s.interceptor != nil {
+		handler = func(ctx context.Context, req *DestroyPrivateLinkRequest) (*DestroyPrivateLinkResponse, error) {
+			resp, err := s.interceptor(
+				func(ctx context.Context, req interface{}) (interface{}, error) {
+					typedReq, ok := req.(*DestroyPrivateLinkRequest)
+					if !ok {
+						return nil, twirp.InternalError("failed type assertion req.(*DestroyPrivateLinkRequest) when calling interceptor")
+					}
+					return s.CloudAgent.DestroyPrivateLink(ctx, typedReq)
+				},
+			)(ctx, req)
+			if resp != nil {
+				typedResp, ok := resp.(*DestroyPrivateLinkResponse)
+				if !ok {
+					return nil, twirp.InternalError("failed type assertion resp.(*DestroyPrivateLinkResponse) when calling interceptor")
+				}
+				return typedResp, err
+			}
+			return nil, err
+		}
+	}
+
+	// Call service method
+	var respContent *DestroyPrivateLinkResponse
+	func() {
+		defer ensurePanicResponses(ctx, resp, s.hooks)
+		respContent, err = handler(ctx, reqContent)
+	}()
+
+	if err != nil {
+		s.writeError(ctx, resp, err)
+		return
+	}
+	if respContent == nil {
+		s.writeError(ctx, resp, twirp.InternalError("received a nil *DestroyPrivateLinkResponse and nil error while calling DestroyPrivateLink. nil responses are not supported"))
+		return
+	}
+
+	ctx = callResponsePrepared(ctx, s.hooks)
+
+	respBytes, err := proto.Marshal(respContent)
+	if err != nil {
+		s.writeError(ctx, resp, wrapInternal(err, "failed to marshal proto response"))
+		return
+	}
+
+	ctx = ctxsetters.WithStatusCode(ctx, http.StatusOK)
+	resp.Header().Set("Content-Type", "application/protobuf")
+	resp.Header().Set("Content-Length", strconv.Itoa(len(respBytes)))
+	resp.WriteHeader(http.StatusOK)
+	if n, err := resp.Write(respBytes); err != nil {
+		msg := fmt.Sprintf("failed to write response, %d of %d bytes written: %s", n, len(respBytes), err.Error())
+		twerr := twirp.NewError(twirp.Unknown, msg)
+		ctx = callError(ctx, s.hooks, twerr)
+	}
+	callResponseSent(ctx, s.hooks)
+}
+
+func (s *cloudAgentServer) serveListPrivateLinks(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+	header := req.Header.Get("Content-Type")
+	i := strings.Index(header, ";")
+	if i == -1 {
+		i = len(header)
+	}
+	switch strings.TrimSpace(strings.ToLower(header[:i])) {
+	case "application/json":
+		s.serveListPrivateLinksJSON(ctx, resp, req)
+	case "application/protobuf":
+		s.serveListPrivateLinksProtobuf(ctx, resp, req)
+	default:
+		msg := fmt.Sprintf("unexpected Content-Type: %q", req.Header.Get("Content-Type"))
+		twerr := badRouteError(msg, req.Method, req.URL.Path)
+		s.writeError(ctx, resp, twerr)
+	}
+}
+
+func (s *cloudAgentServer) serveListPrivateLinksJSON(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+	var err error
+	ctx = ctxsetters.WithMethodName(ctx, "ListPrivateLinks")
+	ctx, err = callRequestRouted(ctx, s.hooks)
+	if err != nil {
+		s.writeError(ctx, resp, err)
+		return
+	}
+
+	d := json.NewDecoder(req.Body)
+	rawReqBody := json.RawMessage{}
+	if err := d.Decode(&rawReqBody); err != nil {
+		s.handleRequestBodyError(ctx, resp, "the json request could not be decoded", err)
+		return
+	}
+	reqContent := new(ListPrivateLinksRequest)
+	unmarshaler := protojson.UnmarshalOptions{DiscardUnknown: true}
+	if err = unmarshaler.Unmarshal(rawReqBody, reqContent); err != nil {
+		s.handleRequestBodyError(ctx, resp, "the json request could not be decoded", err)
+		return
+	}
+
+	handler := s.CloudAgent.ListPrivateLinks
+	if s.interceptor != nil {
+		handler = func(ctx context.Context, req *ListPrivateLinksRequest) (*ListPrivateLinksResponse, error) {
+			resp, err := s.interceptor(
+				func(ctx context.Context, req interface{}) (interface{}, error) {
+					typedReq, ok := req.(*ListPrivateLinksRequest)
+					if !ok {
+						return nil, twirp.InternalError("failed type assertion req.(*ListPrivateLinksRequest) when calling interceptor")
+					}
+					return s.CloudAgent.ListPrivateLinks(ctx, typedReq)
+				},
+			)(ctx, req)
+			if resp != nil {
+				typedResp, ok := resp.(*ListPrivateLinksResponse)
+				if !ok {
+					return nil, twirp.InternalError("failed type assertion resp.(*ListPrivateLinksResponse) when calling interceptor")
+				}
+				return typedResp, err
+			}
+			return nil, err
+		}
+	}
+
+	// Call service method
+	var respContent *ListPrivateLinksResponse
+	func() {
+		defer ensurePanicResponses(ctx, resp, s.hooks)
+		respContent, err = handler(ctx, reqContent)
+	}()
+
+	if err != nil {
+		s.writeError(ctx, resp, err)
+		return
+	}
+	if respContent == nil {
+		s.writeError(ctx, resp, twirp.InternalError("received a nil *ListPrivateLinksResponse and nil error while calling ListPrivateLinks. nil responses are not supported"))
+		return
+	}
+
+	ctx = callResponsePrepared(ctx, s.hooks)
+
+	marshaler := &protojson.MarshalOptions{UseProtoNames: !s.jsonCamelCase, EmitUnpopulated: !s.jsonSkipDefaults}
+	respBytes, err := marshaler.Marshal(respContent)
+	if err != nil {
+		s.writeError(ctx, resp, wrapInternal(err, "failed to marshal json response"))
+		return
+	}
+
+	ctx = ctxsetters.WithStatusCode(ctx, http.StatusOK)
+	resp.Header().Set("Content-Type", "application/json")
+	resp.Header().Set("Content-Length", strconv.Itoa(len(respBytes)))
+	resp.WriteHeader(http.StatusOK)
+
+	if n, err := resp.Write(respBytes); err != nil {
+		msg := fmt.Sprintf("failed to write response, %d of %d bytes written: %s", n, len(respBytes), err.Error())
+		twerr := twirp.NewError(twirp.Unknown, msg)
+		ctx = callError(ctx, s.hooks, twerr)
+	}
+	callResponseSent(ctx, s.hooks)
+}
+
+func (s *cloudAgentServer) serveListPrivateLinksProtobuf(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+	var err error
+	ctx = ctxsetters.WithMethodName(ctx, "ListPrivateLinks")
+	ctx, err = callRequestRouted(ctx, s.hooks)
+	if err != nil {
+		s.writeError(ctx, resp, err)
+		return
+	}
+
+	buf, err := io.ReadAll(req.Body)
+	if err != nil {
+		s.handleRequestBodyError(ctx, resp, "failed to read request body", err)
+		return
+	}
+	reqContent := new(ListPrivateLinksRequest)
+	if err = proto.Unmarshal(buf, reqContent); err != nil {
+		s.writeError(ctx, resp, malformedRequestError("the protobuf request could not be decoded"))
+		return
+	}
+
+	handler := s.CloudAgent.ListPrivateLinks
+	if s.interceptor != nil {
+		handler = func(ctx context.Context, req *ListPrivateLinksRequest) (*ListPrivateLinksResponse, error) {
+			resp, err := s.interceptor(
+				func(ctx context.Context, req interface{}) (interface{}, error) {
+					typedReq, ok := req.(*ListPrivateLinksRequest)
+					if !ok {
+						return nil, twirp.InternalError("failed type assertion req.(*ListPrivateLinksRequest) when calling interceptor")
+					}
+					return s.CloudAgent.ListPrivateLinks(ctx, typedReq)
+				},
+			)(ctx, req)
+			if resp != nil {
+				typedResp, ok := resp.(*ListPrivateLinksResponse)
+				if !ok {
+					return nil, twirp.InternalError("failed type assertion resp.(*ListPrivateLinksResponse) when calling interceptor")
+				}
+				return typedResp, err
+			}
+			return nil, err
+		}
+	}
+
+	// Call service method
+	var respContent *ListPrivateLinksResponse
+	func() {
+		defer ensurePanicResponses(ctx, resp, s.hooks)
+		respContent, err = handler(ctx, reqContent)
+	}()
+
+	if err != nil {
+		s.writeError(ctx, resp, err)
+		return
+	}
+	if respContent == nil {
+		s.writeError(ctx, resp, twirp.InternalError("received a nil *ListPrivateLinksResponse and nil error while calling ListPrivateLinks. nil responses are not supported"))
+		return
+	}
+
+	ctx = callResponsePrepared(ctx, s.hooks)
+
+	respBytes, err := proto.Marshal(respContent)
+	if err != nil {
+		s.writeError(ctx, resp, wrapInternal(err, "failed to marshal proto response"))
+		return
+	}
+
+	ctx = ctxsetters.WithStatusCode(ctx, http.StatusOK)
+	resp.Header().Set("Content-Type", "application/protobuf")
+	resp.Header().Set("Content-Length", strconv.Itoa(len(respBytes)))
+	resp.WriteHeader(http.StatusOK)
+	if n, err := resp.Write(respBytes); err != nil {
+		msg := fmt.Sprintf("failed to write response, %d of %d bytes written: %s", n, len(respBytes), err.Error())
+		twerr := twirp.NewError(twirp.Unknown, msg)
+		ctx = callError(ctx, s.hooks, twerr)
+	}
+	callResponseSent(ctx, s.hooks)
+}
+
+func (s *cloudAgentServer) serveGetPrivateLinkStatus(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+	header := req.Header.Get("Content-Type")
+	i := strings.Index(header, ";")
+	if i == -1 {
+		i = len(header)
+	}
+	switch strings.TrimSpace(strings.ToLower(header[:i])) {
+	case "application/json":
+		s.serveGetPrivateLinkStatusJSON(ctx, resp, req)
+	case "application/protobuf":
+		s.serveGetPrivateLinkStatusProtobuf(ctx, resp, req)
+	default:
+		msg := fmt.Sprintf("unexpected Content-Type: %q", req.Header.Get("Content-Type"))
+		twerr := badRouteError(msg, req.Method, req.URL.Path)
+		s.writeError(ctx, resp, twerr)
+	}
+}
+
+func (s *cloudAgentServer) serveGetPrivateLinkStatusJSON(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+	var err error
+	ctx = ctxsetters.WithMethodName(ctx, "GetPrivateLinkStatus")
+	ctx, err = callRequestRouted(ctx, s.hooks)
+	if err != nil {
+		s.writeError(ctx, resp, err)
+		return
+	}
+
+	d := json.NewDecoder(req.Body)
+	rawReqBody := json.RawMessage{}
+	if err := d.Decode(&rawReqBody); err != nil {
+		s.handleRequestBodyError(ctx, resp, "the json request could not be decoded", err)
+		return
+	}
+	reqContent := new(GetPrivateLinkStatusRequest)
+	unmarshaler := protojson.UnmarshalOptions{DiscardUnknown: true}
+	if err = unmarshaler.Unmarshal(rawReqBody, reqContent); err != nil {
+		s.handleRequestBodyError(ctx, resp, "the json request could not be decoded", err)
+		return
+	}
+
+	handler := s.CloudAgent.GetPrivateLinkStatus
+	if s.interceptor != nil {
+		handler = func(ctx context.Context, req *GetPrivateLinkStatusRequest) (*GetPrivateLinkStatusResponse, error) {
+			resp, err := s.interceptor(
+				func(ctx context.Context, req interface{}) (interface{}, error) {
+					typedReq, ok := req.(*GetPrivateLinkStatusRequest)
+					if !ok {
+						return nil, twirp.InternalError("failed type assertion req.(*GetPrivateLinkStatusRequest) when calling interceptor")
+					}
+					return s.CloudAgent.GetPrivateLinkStatus(ctx, typedReq)
+				},
+			)(ctx, req)
+			if resp != nil {
+				typedResp, ok := resp.(*GetPrivateLinkStatusResponse)
+				if !ok {
+					return nil, twirp.InternalError("failed type assertion resp.(*GetPrivateLinkStatusResponse) when calling interceptor")
+				}
+				return typedResp, err
+			}
+			return nil, err
+		}
+	}
+
+	// Call service method
+	var respContent *GetPrivateLinkStatusResponse
+	func() {
+		defer ensurePanicResponses(ctx, resp, s.hooks)
+		respContent, err = handler(ctx, reqContent)
+	}()
+
+	if err != nil {
+		s.writeError(ctx, resp, err)
+		return
+	}
+	if respContent == nil {
+		s.writeError(ctx, resp, twirp.InternalError("received a nil *GetPrivateLinkStatusResponse and nil error while calling GetPrivateLinkStatus. nil responses are not supported"))
+		return
+	}
+
+	ctx = callResponsePrepared(ctx, s.hooks)
+
+	marshaler := &protojson.MarshalOptions{UseProtoNames: !s.jsonCamelCase, EmitUnpopulated: !s.jsonSkipDefaults}
+	respBytes, err := marshaler.Marshal(respContent)
+	if err != nil {
+		s.writeError(ctx, resp, wrapInternal(err, "failed to marshal json response"))
+		return
+	}
+
+	ctx = ctxsetters.WithStatusCode(ctx, http.StatusOK)
+	resp.Header().Set("Content-Type", "application/json")
+	resp.Header().Set("Content-Length", strconv.Itoa(len(respBytes)))
+	resp.WriteHeader(http.StatusOK)
+
+	if n, err := resp.Write(respBytes); err != nil {
+		msg := fmt.Sprintf("failed to write response, %d of %d bytes written: %s", n, len(respBytes), err.Error())
+		twerr := twirp.NewError(twirp.Unknown, msg)
+		ctx = callError(ctx, s.hooks, twerr)
+	}
+	callResponseSent(ctx, s.hooks)
+}
+
+func (s *cloudAgentServer) serveGetPrivateLinkStatusProtobuf(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+	var err error
+	ctx = ctxsetters.WithMethodName(ctx, "GetPrivateLinkStatus")
+	ctx, err = callRequestRouted(ctx, s.hooks)
+	if err != nil {
+		s.writeError(ctx, resp, err)
+		return
+	}
+
+	buf, err := io.ReadAll(req.Body)
+	if err != nil {
+		s.handleRequestBodyError(ctx, resp, "failed to read request body", err)
+		return
+	}
+	reqContent := new(GetPrivateLinkStatusRequest)
+	if err = proto.Unmarshal(buf, reqContent); err != nil {
+		s.writeError(ctx, resp, malformedRequestError("the protobuf request could not be decoded"))
+		return
+	}
+
+	handler := s.CloudAgent.GetPrivateLinkStatus
+	if s.interceptor != nil {
+		handler = func(ctx context.Context, req *GetPrivateLinkStatusRequest) (*GetPrivateLinkStatusResponse, error) {
+			resp, err := s.interceptor(
+				func(ctx context.Context, req interface{}) (interface{}, error) {
+					typedReq, ok := req.(*GetPrivateLinkStatusRequest)
+					if !ok {
+						return nil, twirp.InternalError("failed type assertion req.(*GetPrivateLinkStatusRequest) when calling interceptor")
+					}
+					return s.CloudAgent.GetPrivateLinkStatus(ctx, typedReq)
+				},
+			)(ctx, req)
+			if resp != nil {
+				typedResp, ok := resp.(*GetPrivateLinkStatusResponse)
+				if !ok {
+					return nil, twirp.InternalError("failed type assertion resp.(*GetPrivateLinkStatusResponse) when calling interceptor")
+				}
+				return typedResp, err
+			}
+			return nil, err
+		}
+	}
+
+	// Call service method
+	var respContent *GetPrivateLinkStatusResponse
+	func() {
+		defer ensurePanicResponses(ctx, resp, s.hooks)
+		respContent, err = handler(ctx, reqContent)
+	}()
+
+	if err != nil {
+		s.writeError(ctx, resp, err)
+		return
+	}
+	if respContent == nil {
+		s.writeError(ctx, resp, twirp.InternalError("received a nil *GetPrivateLinkStatusResponse and nil error while calling GetPrivateLinkStatus. nil responses are not supported"))
+		return
+	}
+
+	ctx = callResponsePrepared(ctx, s.hooks)
+
+	respBytes, err := proto.Marshal(respContent)
+	if err != nil {
+		s.writeError(ctx, resp, wrapInternal(err, "failed to marshal proto response"))
+		return
+	}
+
+	ctx = ctxsetters.WithStatusCode(ctx, http.StatusOK)
+	resp.Header().Set("Content-Type", "application/protobuf")
+	resp.Header().Set("Content-Length", strconv.Itoa(len(respBytes)))
+	resp.WriteHeader(http.StatusOK)
+	if n, err := resp.Write(respBytes); err != nil {
+		msg := fmt.Sprintf("failed to write response, %d of %d bytes written: %s", n, len(respBytes), err.Error())
+		twerr := twirp.NewError(twirp.Unknown, msg)
+		ctx = callError(ctx, s.hooks, twerr)
+	}
+	callResponseSent(ctx, s.hooks)
+}
+
 func (s *cloudAgentServer) ServiceDescriptor() ([]byte, int) {
-	return twirpFileDescriptor5, 0
+	return twirpFileDescriptor6, 0
 }
 
 func (s *cloudAgentServer) ProtocGenTwirpVersion() string {
@@ -3306,101 +5259,169 @@ func (s *cloudAgentServer) PathPrefix() string {
 	return baseServicePath(s.pathPrefix, "livekit", "CloudAgent")
 }
 
-var twirpFileDescriptor5 = []byte{
-	// 1505 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xc4, 0x58, 0x4d, 0x6f, 0xdb, 0x46,
-	0x13, 0x36, 0x25, 0x59, 0x1f, 0x23, 0x2b, 0x71, 0xd6, 0x8e, 0x43, 0xd3, 0x71, 0x22, 0xd3, 0x08,
-	0xe0, 0x37, 0x78, 0xa1, 0xb4, 0xee, 0xa5, 0x49, 0x51, 0xa0, 0x8a, 0xa3, 0xa4, 0xf2, 0x87, 0x62,
-	0xac, 0x1d, 0x17, 0x2d, 0x0a, 0x08, 0xb4, 0xb4, 0x51, 0x59, 0xf3, 0x2b, 0xe4, 0xd2, 0x8d, 0x6f,
-	0xed, 0x6f, 0xe8, 0xa5, 0xf7, 0x02, 0x3d, 0xf4, 0xdc, 0x1f, 0x53, 0xa0, 0xe7, 0xf6, 0xd0, 0x53,
-	0x7f, 0x42, 0xb1, 0x4b, 0x2e, 0xb5, 0x94, 0x28, 0x5b, 0xb1, 0x02, 0xf4, 0xa6, 0xdd, 0x99, 0x9d,
-	0x9d, 0x79, 0xe6, 0x99, 0xd9, 0xa1, 0x60, 0xd5, 0x32, 0xcf, 0xc9, 0x99, 0x49, 0xbb, 0x3d, 0xcb,
-	0x0d, 0xfb, 0x5d, 0x63, 0x40, 0x1c, 0xda, 0xf0, 0x7c, 0x97, 0xba, 0xa8, 0x14, 0x8b, 0xb4, 0xfb,
-	0x03, 0xd7, 0x1d, 0x58, 0xe4, 0x11, 0xdf, 0x3e, 0x0d, 0x5f, 0x3f, 0xa2, 0xa6, 0x4d, 0x02, 0x6a,
-	0xd8, 0x5e, 0xa4, 0xa9, 0xff, 0xa1, 0x40, 0xb5, 0xc9, 0x4e, 0x1e, 0x91, 0x9e, 0x4f, 0x28, 0x42,
-	0x50, 0x70, 0x0c, 0x9b, 0xa8, 0x4a, 0x5d, 0xd9, 0xaa, 0x60, 0xfe, 0x1b, 0x2d, 0xc3, 0xfc, 0xb9,
-	0x61, 0x85, 0x44, 0xcd, 0xd5, 0x95, 0xad, 0x05, 0x1c, 0x2d, 0xd0, 0x63, 0x80, 0x9e, 0x4f, 0x0c,
-	0x4a, 0xfa, 0x5d, 0x83, 0xaa, 0xf9, 0xba, 0xb2, 0x55, 0xdd, 0xd6, 0x1a, 0xd1, 0x7d, 0x0d, 0x71,
-	0x5f, 0xe3, 0x58, 0xdc, 0x87, 0x2b, 0xb1, 0x76, 0x93, 0xb2, 0xa3, 0xa1, 0xd7, 0x17, 0x47, 0x0b,
-	0x57, 0x1f, 0x8d, 0xb5, 0x9b, 0x14, 0xfd, 0x1f, 0x0a, 0x67, 0xa6, 0xd3, 0x57, 0xe7, 0xeb, 0xca,
-	0xd6, 0x8d, 0x6d, 0xb5, 0x11, 0x07, 0xda, 0x90, 0x62, 0xd8, 0x33, 0x9d, 0x3e, 0xe6, 0x5a, 0xfa,
-	0x9f, 0x0a, 0xa0, 0x1d, 0x7e, 0x2d, 0x97, 0x63, 0xf2, 0x26, 0x24, 0x01, 0x45, 0x1b, 0x00, 0x1c,
-	0xad, 0xee, 0x30, 0xd4, 0xa7, 0x39, 0x55, 0xc1, 0x15, 0xbe, 0xdb, 0x61, 0x31, 0x37, 0xa0, 0x14,
-	0x70, 0x6b, 0x81, 0x9a, 0xab, 0xe7, 0xb7, 0xaa, 0xdb, 0xcb, 0x59, 0x57, 0x61, 0xa1, 0x84, 0xee,
-	0x41, 0xd9, 0x27, 0x9e, 0x65, 0xf6, 0x8c, 0x80, 0x63, 0x31, 0xcf, 0x0d, 0x26, 0x7b, 0xe8, 0x01,
-	0x2c, 0xd8, 0xc6, 0xdb, 0x6e, 0xa2, 0x53, 0x48, 0x74, 0xaa, 0xb6, 0xf1, 0x16, 0x0b, 0xb5, 0x35,
-	0x28, 0xf5, 0xbc, 0xb0, 0xeb, 0x93, 0x37, 0x3c, 0xc2, 0xc8, 0xad, 0x62, 0xcf, 0x0b, 0x31, 0x79,
-	0x83, 0x54, 0x28, 0xf9, 0x64, 0x60, 0xba, 0x4e, 0xa0, 0x16, 0xeb, 0xf9, 0xad, 0x0a, 0x16, 0x4b,
-	0xfd, 0xb7, 0x1c, 0x2c, 0xa5, 0xe2, 0x0c, 0x3c, 0xd7, 0x09, 0x08, 0x5a, 0x85, 0x72, 0x14, 0xa8,
-	0xd9, 0x8f, 0x33, 0x5a, 0xe2, 0xeb, 0x76, 0x1f, 0xad, 0xa7, 0x30, 0xc8, 0x71, 0xa1, 0x14, 0xff,
-	0x0a, 0x14, 0x03, 0x6a, 0xd0, 0x30, 0x8a, 0xa6, 0x82, 0xe3, 0x15, 0xf3, 0xe1, 0x9c, 0xf8, 0x81,
-	0xe9, 0x3a, 0x3c, 0x84, 0x0a, 0x16, 0x4b, 0xb4, 0x09, 0x35, 0xcf, 0x27, 0x81, 0x39, 0x70, 0x48,
-	0xbf, 0x1b, 0xfa, 0x56, 0x14, 0x00, 0x5e, 0x48, 0x36, 0x5f, 0xf9, 0x16, 0x5a, 0x84, 0x3c, 0x35,
-	0x06, 0x6a, 0x91, 0x8b, 0xd8, 0x4f, 0xf4, 0x00, 0x6e, 0x04, 0xc4, 0x3f, 0x27, 0x7e, 0x57, 0xc4,
-	0x56, 0xe2, 0xb1, 0xd5, 0xa2, 0x5d, 0x1c, 0x6d, 0xa2, 0x23, 0x58, 0x19, 0x5a, 0xf7, 0xdc, 0x80,
-	0x32, 0x8c, 0x58, 0x32, 0xd5, 0x32, 0xa7, 0xcf, 0x7a, 0x92, 0x9e, 0x43, 0xa1, 0x76, 0xe8, 0x06,
-	0x22, 0xe3, 0x78, 0xd9, 0xcb, 0xd8, 0xd5, 0x7f, 0x51, 0x60, 0x39, 0x4b, 0x9d, 0xb9, 0xc9, 0x22,
-	0x88, 0x20, 0x63, 0x3f, 0x51, 0x13, 0x8a, 0x9c, 0xf6, 0x82, 0x0e, 0xff, 0xbb, 0xf4, 0xbe, 0xc6,
-	0x09, 0xd7, 0x6d, 0x39, 0xd4, 0xbf, 0xc0, 0xf1, 0x41, 0xed, 0x31, 0x54, 0xa5, 0x6d, 0x76, 0xc7,
-	0x19, 0xb9, 0x10, 0x77, 0x9c, 0x91, 0x8b, 0x74, 0x9d, 0x55, 0xe2, 0x3a, 0x7b, 0x92, 0xfb, 0x58,
-	0xd1, 0x7f, 0xc8, 0xc3, 0x4d, 0x9e, 0xd9, 0x67, 0xc4, 0xb3, 0xdc, 0x0b, 0x9b, 0x38, 0x94, 0x65,
-	0x28, 0x42, 0x2c, 0x36, 0x11, 0xaf, 0x52, 0x39, 0xcf, 0xa5, 0x73, 0x3e, 0x29, 0xa9, 0x9a, 0x44,
-	0x5e, 0x4e, 0x4c, 0x89, 0xb8, 0x1b, 0xb0, 0x60, 0x9b, 0xce, 0x90, 0xb8, 0xf3, 0x5c, 0x5e, 0xb5,
-	0x4d, 0x07, 0xcb, 0x2a, 0x32, 0xb7, 0x8b, 0xb1, 0x8a, 0xc4, 0xeb, 0x3b, 0x43, 0x5e, 0x97, 0xa2,
-	0xab, 0x63, 0x4e, 0x33, 0x41, 0xe8, 0x77, 0x7b, 0x5e, 0xc8, 0x13, 0xc9, 0x04, 0xa1, 0xbf, 0xe3,
-	0x85, 0x42, 0x60, 0x13, 0x5b, 0xad, 0x24, 0x82, 0x03, 0x62, 0x33, 0x81, 0x4d, 0x6c, 0x6e, 0x0a,
-	0x22, 0x81, 0x4d, 0x6c, 0x66, 0x6a, 0x0d, 0x2a, 0x4c, 0x60, 0x99, 0xb6, 0x49, 0xd5, 0x2a, 0x17,
-	0x95, 0x6d, 0x62, 0xef, 0xb3, 0x35, 0x13, 0x32, 0x07, 0x22, 0xe1, 0x42, 0x24, 0xec, 0x79, 0x61,
-	0x24, 0xdc, 0x84, 0x5a, 0x8a, 0x83, 0x6a, 0x2d, 0xa2, 0xae, 0x4c, 0x41, 0xfd, 0xc7, 0x1c, 0x54,
-	0x78, 0x0e, 0xda, 0xce, 0x6b, 0x77, 0x86, 0xca, 0x92, 0x2a, 0x28, 0x9f, 0xae, 0xa0, 0x16, 0xdc,
-	0x8a, 0x0e, 0xf6, 0x93, 0x2c, 0xb3, 0x7c, 0x30, 0xba, 0x8d, 0x34, 0xba, 0x21, 0x0d, 0xf0, 0xa2,
-	0x91, 0xde, 0x08, 0xe4, 0xd6, 0x35, 0x3f, 0x4d, 0xeb, 0xfa, 0x04, 0xaa, 0xd1, 0x85, 0x51, 0x3b,
-	0x2e, 0x5e, 0xd9, 0x8e, 0x41, 0xa8, 0x37, 0xa9, 0x7e, 0x00, 0xb7, 0xf6, 0xcd, 0x80, 0x72, 0xc3,
-	0x81, 0x28, 0x9f, 0xf5, 0xf1, 0xfe, 0x2a, 0x23, 0x30, 0x99, 0xa1, 0xfa, 0x67, 0x80, 0x64, 0x73,
-	0x71, 0x1b, 0x7b, 0x08, 0x45, 0xae, 0x10, 0xa8, 0x0a, 0x0f, 0x08, 0xa5, 0x03, 0x62, 0x09, 0xc1,
-	0xb1, 0x86, 0xfe, 0x7b, 0x0e, 0x16, 0xf8, 0xee, 0x49, 0x8c, 0xaa, 0x84, 0xb7, 0x92, 0xc6, 0x5b,
-	0xe5, 0x14, 0xf3, 0x89, 0x43, 0xb9, 0x1b, 0x65, 0x2c, 0x96, 0xb3, 0xbc, 0x6d, 0x23, 0x68, 0x16,
-	0xde, 0x05, 0x4d, 0xd4, 0x02, 0x30, 0x28, 0xf5, 0xcd, 0xd3, 0x90, 0x12, 0x91, 0xbd, 0x07, 0xe9,
-	0x60, 0xe3, 0xb0, 0x1a, 0xcd, 0x44, 0x2f, 0xea, 0x32, 0xd2, 0x41, 0xa9, 0xce, 0x8b, 0x72, 0x9d,
-	0x6b, 0x9f, 0xc2, 0xcd, 0x91, 0x63, 0xef, 0xd4, 0x85, 0x8e, 0x41, 0x4d, 0x92, 0x13, 0xbb, 0x91,
-	0xa4, 0xfc, 0xda, 0xf5, 0xa0, 0x77, 0x60, 0x35, 0xc3, 0x6a, 0x9c, 0xf9, 0x0f, 0xa1, 0x1c, 0x67,
-	0x4b, 0xe4, 0xfe, 0x76, 0x26, 0x1c, 0x38, 0x51, 0xd3, 0xbf, 0xcf, 0x01, 0x7a, 0xc5, 0xe7, 0x85,
-	0xd4, 0x9b, 0x7f, 0x89, 0x83, 0x1b, 0xe3, 0x0e, 0x8e, 0x8e, 0x03, 0xff, 0xe9, 0xf3, 0x2e, 0x57,
-	0x74, 0x69, 0x8a, 0x8a, 0xd6, 0xdb, 0xb0, 0x94, 0x42, 0x20, 0x06, 0x53, 0x85, 0x52, 0x10, 0xf6,
-	0x7a, 0x24, 0x08, 0x38, 0x02, 0x65, 0x2c, 0x96, 0x4c, 0x62, 0x93, 0x20, 0x30, 0x06, 0x22, 0x3f,
-	0x62, 0xa9, 0x7f, 0x00, 0x4b, 0x98, 0x11, 0xd5, 0xa7, 0x53, 0xa2, 0xa9, 0xef, 0xc2, 0x72, 0xfa,
-	0xc4, 0x0c, 0xb7, 0xff, 0xa5, 0x00, 0x8a, 0x5a, 0xdb, 0x7b, 0xcc, 0xa5, 0x84, 0x66, 0xfe, 0x5d,
-	0x47, 0xbb, 0xc2, 0x14, 0xb9, 0x9f, 0xbf, 0x32, 0xf7, 0xc5, 0xd1, 0xdc, 0xeb, 0xff, 0x28, 0xb0,
-	0x94, 0x0a, 0xf4, 0xfa, 0xa0, 0xa5, 0xd0, 0xc9, 0xa7, 0xd1, 0x19, 0x9b, 0xd1, 0x0a, 0x93, 0x67,
-	0xb4, 0xf9, 0xe1, 0x8c, 0x36, 0x79, 0xf8, 0x2a, 0x5e, 0x7f, 0xf8, 0xfa, 0x59, 0x81, 0x55, 0x89,
-	0xa5, 0x11, 0xea, 0xb3, 0xf7, 0x13, 0x74, 0x17, 0x2a, 0xee, 0x39, 0xf1, 0xbf, 0xf3, 0x4d, 0x4a,
-	0x78, 0xfc, 0x65, 0x3c, 0xdc, 0x90, 0x93, 0x5f, 0x98, 0xa6, 0x94, 0x0e, 0x41, 0xcb, 0x72, 0x72,
-	0x06, 0x4e, 0x7f, 0x0b, 0xcb, 0xd8, 0xb5, 0xac, 0x53, 0xa3, 0x77, 0x36, 0x2d, 0xa9, 0xaf, 0x3b,
-	0x51, 0xe8, 0x7b, 0x70, 0x7b, 0xe4, 0xae, 0x19, 0x1c, 0xef, 0xb0, 0x5a, 0xb4, 0xc8, 0xf4, 0x7d,
-	0xf5, 0x8a, 0xc6, 0xdf, 0x66, 0x94, 0x97, 0xec, 0xcd, 0xe0, 0xda, 0x11, 0xdc, 0x49, 0xde, 0x90,
-	0xf7, 0x45, 0x24, 0x7d, 0x57, 0x7a, 0xee, 0x46, 0x13, 0x2f, 0xd1, 0x48, 0x99, 0x86, 0x46, 0x8f,
-	0xa1, 0x76, 0x44, 0x28, 0x35, 0x9d, 0x41, 0x70, 0x68, 0xf8, 0x86, 0x7d, 0xf5, 0x77, 0xb6, 0x78,
-	0x79, 0xf5, 0xcf, 0x61, 0x65, 0xc7, 0x32, 0xb9, 0xcd, 0xc8, 0x80, 0xe4, 0x44, 0xd1, 0x63, 0xc6,
-	0x84, 0x0f, 0x2b, 0x89, 0x0f, 0xa9, 0xbb, 0x70, 0xac, 0xa5, 0xdf, 0x81, 0xdb, 0xa3, 0x96, 0x38,
-	0x46, 0x0f, 0xdd, 0xf8, 0xeb, 0x62, 0xf8, 0xfd, 0x8c, 0xd6, 0x61, 0xb5, 0xf9, 0xa2, 0xd5, 0x39,
-	0xee, 0x1e, 0xb5, 0x76, 0x70, 0xeb, 0xb8, 0xbb, 0xd7, 0xee, 0x3c, 0xeb, 0xbe, 0xea, 0xec, 0x75,
-	0x5e, 0x7e, 0xd1, 0x59, 0x9c, 0x43, 0x1b, 0xb0, 0x3e, 0x2e, 0x6e, 0x75, 0x4e, 0xda, 0xf8, 0x65,
-	0xe7, 0xa0, 0xd5, 0x39, 0x5e, 0x54, 0x90, 0x06, 0x2b, 0xe3, 0x2a, 0xcf, 0xdb, 0xfb, 0xad, 0xc5,
-	0xdc, 0xf6, 0x4f, 0x25, 0x80, 0x1d, 0xcb, 0x0d, 0xfb, 0xfc, 0x5a, 0xb4, 0x0b, 0x55, 0xe9, 0xeb,
-	0x15, 0xad, 0x25, 0x71, 0x8c, 0x7f, 0xbb, 0x6b, 0x77, 0xb3, 0x85, 0x11, 0x24, 0xfa, 0x1c, 0x7a,
-	0x01, 0x30, 0x9c, 0x20, 0x91, 0x96, 0x68, 0x8f, 0x4d, 0xa9, 0xda, 0x5a, 0xa6, 0x2c, 0x31, 0xf4,
-	0xb5, 0x34, 0xd9, 0x8a, 0xb9, 0x04, 0x6d, 0x8c, 0x9f, 0x19, 0x99, 0x84, 0x34, 0xfd, 0x32, 0x95,
-	0xc4, 0xfa, 0x97, 0xb0, 0x38, 0x4a, 0x2e, 0x54, 0x1f, 0x3f, 0x99, 0x26, 0xb3, 0xb6, 0x71, 0x89,
-	0x46, 0x62, 0x7a, 0x17, 0xaa, 0x52, 0xcb, 0x92, 0xd0, 0x1c, 0x9f, 0x8a, 0x24, 0x34, 0x33, 0x06,
-	0x06, 0x7d, 0x0e, 0x1d, 0xc0, 0x82, 0xfc, 0x98, 0xa3, 0xa1, 0x7e, 0xc6, 0x54, 0xa0, 0xad, 0x4f,
-	0x90, 0xca, 0xae, 0x49, 0xaf, 0x9c, 0xe4, 0xda, 0xf8, 0x23, 0x2f, 0xb9, 0x96, 0xf1, 0x30, 0xea,
-	0x73, 0xa8, 0x9b, 0x1a, 0xf3, 0x04, 0x86, 0x7a, 0x56, 0x40, 0x23, 0x28, 0x6e, 0x5e, 0xaa, 0x93,
-	0x5c, 0x70, 0x08, 0xb5, 0x54, 0xf3, 0x44, 0x52, 0x78, 0x19, 0x0d, 0x5c, 0xbb, 0x37, 0x49, 0x9c,
-	0x0e, 0x3f, 0xe9, 0x78, 0xa9, 0xf0, 0x47, 0xfb, 0x6a, 0x2a, 0xfc, 0xb1, 0x26, 0xa9, 0xcf, 0xa1,
-	0x13, 0xb8, 0xf5, 0x82, 0xd0, 0x74, 0x3d, 0xa3, 0xa1, 0x0b, 0x99, 0x85, 0xae, 0xdd, 0x9f, 0x28,
-	0x17, 0x76, 0x9f, 0x3e, 0xff, 0x6a, 0x73, 0x60, 0xd2, 0x6f, 0xc2, 0xd3, 0x46, 0xcf, 0xb5, 0x1f,
-	0xc5, 0xea, 0xd1, 0xff, 0x87, 0x3d, 0xd7, 0x12, 0x1b, 0xbf, 0xe6, 0x6a, 0xfb, 0xe6, 0x39, 0xd9,
-	0xe3, 0x4f, 0xbe, 0x4b, 0xdd, 0xbf, 0x73, 0x37, 0xe2, 0xf5, 0x93, 0x27, 0x7c, 0xe3, 0xb4, 0xc8,
-	0x8f, 0x7c, 0xf4, 0x6f, 0x00, 0x00, 0x00, 0xff, 0xff, 0x2d, 0xda, 0x9e, 0xef, 0xa6, 0x14, 0x00,
-	0x00,
+var twirpFileDescriptor6 = []byte{
+	// 2600 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xc4, 0x5a, 0x5d, 0x6f, 0x1b, 0x4b,
+	0xf9, 0xcf, 0xfa, 0x2d, 0xf6, 0xe3, 0xb8, 0x71, 0x26, 0x69, 0xea, 0x38, 0x49, 0x9b, 0x6c, 0xdb,
+	0xff, 0x3f, 0xb4, 0xe7, 0xb8, 0xa7, 0x45, 0x82, 0xb6, 0x80, 0x84, 0x93, 0x6c, 0x13, 0x37, 0x89,
+	0x63, 0xad, 0x9d, 0x54, 0x45, 0x48, 0x7b, 0x36, 0xf6, 0xd4, 0xac, 0xe2, 0x7d, 0xe9, 0xee, 0xda,
+	0x3d, 0x41, 0xe2, 0x0a, 0x09, 0x01, 0x3a, 0xdf, 0x00, 0x09, 0x10, 0x17, 0x5c, 0xf0, 0x05, 0x90,
+	0x7a, 0xc5, 0x1d, 0x1f, 0x03, 0x6e, 0x40, 0x88, 0xef, 0x80, 0x84, 0x76, 0x66, 0x76, 0x77, 0xd6,
+	0xbb, 0x49, 0x9c, 0xe4, 0x54, 0xdc, 0xb4, 0x9e, 0x79, 0x9e, 0x99, 0x79, 0x5e, 0x7e, 0xf3, 0x7b,
+	0x66, 0x66, 0x03, 0x4b, 0x03, 0x6d, 0x84, 0x4f, 0x35, 0x57, 0xe9, 0x0e, 0xcc, 0x61, 0x4f, 0x51,
+	0xfb, 0xd8, 0x70, 0x6b, 0x96, 0x6d, 0xba, 0x26, 0x9a, 0x66, 0xa2, 0xea, 0xbd, 0xbe, 0x69, 0xf6,
+	0x07, 0xf8, 0x09, 0xe9, 0x3e, 0x19, 0xbe, 0x7b, 0xe2, 0x6a, 0x3a, 0x76, 0x5c, 0x55, 0xb7, 0xa8,
+	0x66, 0x75, 0x61, 0x60, 0xf6, 0xfb, 0xd8, 0x7e, 0x62, 0x5a, 0xae, 0x66, 0x1a, 0x0e, 0xed, 0x15,
+	0x7f, 0x25, 0x00, 0xd4, 0xbd, 0xf9, 0xa4, 0x11, 0x36, 0x5c, 0xf4, 0x18, 0x32, 0xee, 0x99, 0x85,
+	0x2b, 0xc2, 0x9a, 0xb0, 0x71, 0xeb, 0xd9, 0x9d, 0x1a, 0x9b, 0xbd, 0x16, 0xaa, 0x74, 0xce, 0x2c,
+	0x2c, 0x13, 0x25, 0xb4, 0x00, 0xd9, 0xae, 0x39, 0x34, 0xdc, 0x4a, 0x6a, 0x4d, 0xd8, 0xc8, 0xca,
+	0xb4, 0x81, 0x9e, 0x43, 0x21, 0x58, 0xba, 0x92, 0x5e, 0x13, 0x36, 0x8a, 0xcf, 0xaa, 0x35, 0x6a,
+	0x5c, 0xcd, 0x37, 0xae, 0xd6, 0xf1, 0x35, 0xe4, 0x50, 0x59, 0xfc, 0x8f, 0x00, 0x45, 0xb2, 0x50,
+	0x1b, 0x77, 0x6d, 0xec, 0x22, 0x04, 0x19, 0x43, 0xd5, 0xa9, 0x31, 0x05, 0x99, 0xfc, 0xf6, 0xd6,
+	0x1c, 0xa9, 0x83, 0x21, 0x26, 0x6b, 0xce, 0xc8, 0xb4, 0x81, 0x5e, 0x00, 0x74, 0x6d, 0xac, 0xba,
+	0xb8, 0xa7, 0xa8, 0xee, 0x24, 0x8b, 0x32, 0xed, 0xba, 0xeb, 0x0d, 0x1d, 0x5a, 0x3d, 0x7f, 0x68,
+	0xe6, 0xf2, 0xa1, 0x4c, 0xbb, 0xee, 0xa2, 0xcf, 0x20, 0x73, 0xaa, 0x19, 0xbd, 0x4a, 0x96, 0x04,
+	0xab, 0x12, 0x0d, 0x16, 0xf5, 0x61, 0x4f, 0x33, 0x7a, 0x32, 0xd1, 0x42, 0x6b, 0x50, 0xec, 0x61,
+	0x6b, 0x60, 0x9e, 0xe9, 0xd8, 0x70, 0x9d, 0x4a, 0x6e, 0x2d, 0xbd, 0x51, 0x90, 0xf9, 0x2e, 0xf1,
+	0x1f, 0x02, 0xa0, 0x2d, 0x62, 0x18, 0x99, 0x41, 0xc6, 0xef, 0x87, 0xd8, 0x71, 0xd1, 0x3a, 0x00,
+	0xc9, 0xb8, 0x12, 0x06, 0x63, 0x33, 0x55, 0x11, 0xe4, 0x02, 0xe9, 0x6d, 0x7a, 0x51, 0xa9, 0xc1,
+	0xb4, 0x43, 0xd6, 0x73, 0x2a, 0xa9, 0xb5, 0xf4, 0x46, 0xf1, 0xd9, 0x42, 0x92, 0x31, 0xb2, 0xaf,
+	0x84, 0xee, 0x42, 0xde, 0xc6, 0xd6, 0x40, 0xeb, 0xaa, 0x0e, 0x89, 0x56, 0x96, 0x4c, 0x18, 0xf4,
+	0xa1, 0x87, 0x30, 0xa3, 0xab, 0x5f, 0x29, 0x81, 0x4e, 0x26, 0xd0, 0x29, 0xea, 0xea, 0x57, 0xb2,
+	0xaf, 0xb6, 0x0c, 0xd3, 0x5d, 0x6b, 0xa8, 0xd8, 0xf8, 0x3d, 0x89, 0x01, 0x35, 0x2b, 0xd7, 0xb5,
+	0x86, 0x32, 0x7e, 0x8f, 0x2a, 0x30, 0x6d, 0xe3, 0xbe, 0x07, 0x35, 0xe6, 0xab, 0xdf, 0x14, 0xff,
+	0x92, 0x82, 0xf9, 0x88, 0x9f, 0x8e, 0x65, 0x1a, 0x0e, 0x46, 0x0f, 0x21, 0x4f, 0x1d, 0xd5, 0x7a,
+	0xcc, 0x4d, 0xf8, 0xd8, 0x9a, 0x26, 0x5d, 0x8d, 0x6d, 0x99, 0xfd, 0xe8, 0xa1, 0xd5, 0x48, 0x3c,
+	0x52, 0x04, 0x1c, 0x5c, 0x2c, 0x16, 0x21, 0xe7, 0xb8, 0xaa, 0x3b, 0xa4, 0x9e, 0x15, 0x64, 0xd6,
+	0xf2, 0xec, 0x19, 0x61, 0xdb, 0xd1, 0x4c, 0x83, 0xb8, 0x53, 0x90, 0xfd, 0x26, 0xba, 0x0f, 0x25,
+	0xcb, 0xc6, 0x8e, 0xd6, 0x37, 0x70, 0x4f, 0x19, 0xda, 0x03, 0xea, 0x8c, 0x3c, 0x13, 0x74, 0x1e,
+	0xd9, 0x03, 0x54, 0x86, 0xb4, 0xab, 0xf6, 0x2b, 0x39, 0x22, 0xf2, 0x7e, 0xa2, 0x87, 0x70, 0xcb,
+	0xc1, 0xf6, 0x08, 0xdb, 0x8a, 0xef, 0xe7, 0x34, 0xf1, 0xb3, 0x44, 0x7b, 0x65, 0xda, 0x89, 0xda,
+	0xb0, 0x18, 0xce, 0x6e, 0x99, 0x8e, 0xeb, 0xc5, 0xcb, 0x4b, 0x6c, 0x25, 0x4f, 0xc0, 0xb6, 0x1a,
+	0xa4, 0xaa, 0xe5, 0xab, 0xb5, 0x4c, 0xc7, 0xcf, 0xbe, 0xbc, 0x60, 0x25, 0xf4, 0x8a, 0x5f, 0xc2,
+	0x02, 0x17, 0xc1, 0xe3, 0x67, 0x3e, 0x56, 0x38, 0x20, 0x08, 0x93, 0x00, 0x81, 0x4b, 0x52, 0x2a,
+	0x9a, 0xa4, 0x9f, 0xc1, 0xed, 0xb1, 0x15, 0xae, 0x96, 0xa5, 0x30, 0x0d, 0xa9, 0x48, 0x1a, 0xe2,
+	0x51, 0x4b, 0x27, 0x44, 0x4d, 0xfc, 0xb5, 0x00, 0xf3, 0x2d, 0xdb, 0xd4, 0xcd, 0xb1, 0xcd, 0x30,
+	0xe1, 0xea, 0xde, 0x2a, 0x76, 0x57, 0x09, 0x77, 0x17, 0xb3, 0xa2, 0xe4, 0xd8, 0xdd, 0xed, 0xa0,
+	0xd3, 0x53, 0xeb, 0x39, 0x2e, 0xaf, 0x46, 0x31, 0x53, 0xea, 0x39, 0x6e, 0xa8, 0x26, 0xfe, 0x5d,
+	0x80, 0x85, 0xa8, 0x31, 0x2c, 0x16, 0x15, 0x98, 0x76, 0x86, 0xdd, 0x2e, 0x76, 0x1c, 0x62, 0x4c,
+	0x5e, 0xf6, 0x9b, 0x9e, 0x44, 0xc7, 0x8e, 0xa3, 0xf6, 0x7d, 0x84, 0xfa, 0xcd, 0x88, 0x07, 0xe9,
+	0xab, 0x78, 0x90, 0x99, 0xcc, 0x83, 0x6c, 0x82, 0x07, 0xe8, 0x1e, 0x14, 0x19, 0xda, 0x95, 0x10,
+	0xc5, 0xc0, 0xba, 0x3a, 0x6a, 0x5f, 0xfc, 0x23, 0x71, 0x31, 0x8e, 0x34, 0x0f, 0xf7, 0xde, 0x96,
+	0xa0, 0x1c, 0xec, 0xfd, 0x44, 0x75, 0xc8, 0x11, 0xd6, 0xf5, 0xb9, 0xe6, 0x5b, 0x17, 0x02, 0xb8,
+	0x76, 0x4c, 0x74, 0x25, 0xc3, 0xb5, 0xcf, 0x64, 0x36, 0xb0, 0xfa, 0x02, 0x8a, 0x5c, 0xb7, 0xb7,
+	0xc6, 0x29, 0x3e, 0xf3, 0xd7, 0x38, 0xc5, 0x67, 0x51, 0x9a, 0x2f, 0x30, 0x9a, 0x7f, 0x99, 0x7a,
+	0x2e, 0x88, 0xbf, 0xc8, 0xc2, 0x2c, 0x49, 0x02, 0xe7, 0xdd, 0x22, 0xe4, 0x28, 0x98, 0xd8, 0x14,
+	0xac, 0x15, 0x09, 0x75, 0x6a, 0x12, 0xa8, 0x46, 0x19, 0xa3, 0xca, 0xb1, 0x24, 0x61, 0x40, 0x8e,
+	0x21, 0xd7, 0x61, 0x46, 0xd7, 0x8c, 0x90, 0x21, 0xb3, 0x44, 0x5e, 0xd4, 0x35, 0x43, 0xe6, 0x55,
+	0x78, 0x12, 0xcd, 0x31, 0x15, 0x8e, 0x40, 0xef, 0x84, 0x04, 0x3a, 0x4d, 0x97, 0x66, 0xe4, 0xe9,
+	0x09, 0x86, 0xb6, 0xd2, 0xb5, 0x86, 0x84, 0x25, 0x3c, 0xc1, 0xd0, 0xde, 0xb2, 0x86, 0xbe, 0x40,
+	0xc7, 0x7a, 0xa5, 0x10, 0x08, 0x0e, 0xb0, 0xee, 0x09, 0x74, 0xac, 0x93, 0xa9, 0x80, 0x0a, 0x74,
+	0xac, 0x7b, 0x53, 0x2d, 0x43, 0xc1, 0x13, 0x0c, 0x34, 0x5d, 0x73, 0x2b, 0x45, 0x22, 0xca, 0xeb,
+	0x58, 0xdf, 0xf7, 0xda, 0x9e, 0xd0, 0x33, 0x80, 0x0a, 0x67, 0xa8, 0xb0, 0x6b, 0x0d, 0xa9, 0xf0,
+	0x3e, 0x94, 0x22, 0x5b, 0xb5, 0x52, 0xa2, 0xbc, 0xc8, 0xef, 0x54, 0xf4, 0x18, 0x72, 0x78, 0x44,
+	0x2a, 0xda, 0x2d, 0x82, 0x86, 0xf9, 0x84, 0x33, 0x83, 0xcc, 0x54, 0xd0, 0x5d, 0x00, 0x0e, 0xa9,
+	0xb3, 0x14, 0x85, 0x61, 0x0f, 0xcf, 0xd1, 0xe5, 0x28, 0x47, 0x47, 0x49, 0x7f, 0x6e, 0x9c, 0xf4,
+	0x3f, 0x07, 0x14, 0x4e, 0xa3, 0x60, 0x43, 0x3d, 0x19, 0xe0, 0x5e, 0x05, 0x91, 0x3d, 0x39, 0x17,
+	0x4a, 0x24, 0x2a, 0x40, 0x9b, 0x30, 0x3b, 0x50, 0x1d, 0x57, 0x71, 0xba, 0xb6, 0x6a, 0xd1, 0xca,
+	0x3f, 0x7f, 0x69, 0xe5, 0x2f, 0x79, 0x43, 0xda, 0x74, 0x44, 0xdd, 0x15, 0x7f, 0x97, 0x82, 0x02,
+	0x71, 0xb1, 0x61, 0xbc, 0x33, 0xbf, 0xa1, 0xda, 0xc5, 0xf9, 0x9f, 0x8e, 0xfa, 0x2f, 0xc1, 0x1c,
+	0x1d, 0xc8, 0x9f, 0x21, 0x32, 0x24, 0xe2, 0x63, 0x07, 0x8f, 0x70, 0x5f, 0xc8, 0x65, 0x35, 0xda,
+	0xe1, 0xf0, 0xf5, 0x21, 0x3b, 0x49, 0x7d, 0xf8, 0x9e, 0x7f, 0x68, 0xa1, 0x41, 0xca, 0x5d, 0x1a,
+	0x24, 0xf0, 0xd5, 0xeb, 0xae, 0xf8, 0x16, 0xe6, 0xf6, 0x35, 0xc7, 0x25, 0x13, 0x3b, 0x3e, 0x9f,
+	0xac, 0xc6, 0x4f, 0x33, 0x7c, 0x04, 0x26, 0xdb, 0xb2, 0xe2, 0x0f, 0x01, 0xf1, 0x53, 0x33, 0x3a,
+	0x7e, 0x04, 0x39, 0xa2, 0xe0, 0x17, 0x3f, 0x14, 0x75, 0xce, 0x4b, 0x94, 0xcc, 0x34, 0xc4, 0x3f,
+	0xa4, 0x61, 0x86, 0x96, 0x36, 0x16, 0x61, 0x2e, 0xf6, 0x42, 0x34, 0xf6, 0x15, 0xb2, 0xe7, 0x6c,
+	0xbf, 0x8a, 0xe4, 0x65, 0xbf, 0x79, 0x93, 0x73, 0xe7, 0x58, 0x64, 0x33, 0x57, 0x89, 0x2c, 0x92,
+	0x00, 0x54, 0xd7, 0xb5, 0xb5, 0x93, 0xa1, 0x8b, 0xfd, 0x4c, 0x3e, 0x8c, 0x3a, 0xcb, 0xdc, 0xaa,
+	0xd5, 0x03, 0x3d, 0x4a, 0xc1, 0xdc, 0x40, 0x8e, 0xf8, 0x72, 0x11, 0xe2, 0x5b, 0x80, 0xac, 0xf9,
+	0xc1, 0xc0, 0x36, 0x23, 0x25, 0xda, 0xf0, 0xe8, 0xb0, 0x67, 0xab, 0x9a, 0xa1, 0x19, 0x7d, 0x42,
+	0x4a, 0x79, 0x39, 0x68, 0x7b, 0x33, 0xa9, 0x5d, 0x57, 0x1b, 0x61, 0xc2, 0x4a, 0x79, 0x99, 0xb5,
+	0xaa, 0x3f, 0x80, 0xd9, 0x31, 0x03, 0xae, 0x44, 0xf6, 0x5f, 0x42, 0x25, 0x48, 0x33, 0x73, 0xc8,
+	0xb9, 0xe2, 0x49, 0xe0, 0xe2, 0x1d, 0x27, 0x36, 0x61, 0x29, 0x61, 0x05, 0x86, 0xa7, 0xa7, 0x90,
+	0x67, 0x18, 0xf0, 0x11, 0x75, 0x3b, 0x31, 0xc8, 0x72, 0xa0, 0x26, 0x7e, 0x9d, 0x02, 0x74, 0x44,
+	0x6e, 0x08, 0xd7, 0x39, 0xb6, 0xac, 0xc7, 0x8d, 0x1d, 0x3f, 0xea, 0xff, 0x4f, 0x8f, 0xee, 0x3c,
+	0x7f, 0x4c, 0x4f, 0xc0, 0x1f, 0x62, 0x03, 0xe6, 0x23, 0xd1, 0xb8, 0xfe, 0xb9, 0x49, 0xfc, 0x3e,
+	0xcc, 0xcb, 0xde, 0x56, 0xb0, 0xdd, 0x6b, 0x44, 0x56, 0x7c, 0x0d, 0x0b, 0xd1, 0xd1, 0x37, 0xb0,
+	0xe4, 0xb7, 0x69, 0x40, 0x94, 0x54, 0x3f, 0x51, 0x8e, 0xb9, 0x28, 0xa7, 0xaf, 0x7a, 0x9d, 0xcb,
+	0x4c, 0x80, 0x89, 0xec, 0xa5, 0x98, 0xc8, 0xc5, 0x30, 0x11, 0x2d, 0xdd, 0xd3, 0xb1, 0xd2, 0xbd,
+	0x17, 0xa1, 0xa4, 0x3c, 0x31, 0xfb, 0x71, 0x60, 0x76, 0x3c, 0x5c, 0x17, 0x11, 0xd3, 0x4d, 0x69,
+	0xe3, 0xf7, 0x29, 0x98, 0x8f, 0xac, 0xf8, 0xe9, 0x8f, 0xeb, 0xff, 0x3f, 0x7e, 0x87, 0xcc, 0x04,
+	0x11, 0x4c, 0xbc, 0x47, 0x66, 0xc3, 0x7b, 0xe4, 0xf9, 0x17, 0xc4, 0xdc, 0xb5, 0x2f, 0x88, 0x97,
+	0xa5, 0x4b, 0xfc, 0x4d, 0x0a, 0x16, 0xb8, 0x10, 0x85, 0x37, 0xc8, 0x09, 0x51, 0x7c, 0xf5, 0x17,
+	0x07, 0x88, 0xdd, 0xb2, 0x78, 0xf8, 0x1c, 0x44, 0xe0, 0x43, 0x0f, 0x36, 0x9f, 0x27, 0xc1, 0x27,
+	0xb0, 0xf4, 0x53, 0x02, 0xe8, 0x5f, 0x02, 0xdc, 0x1e, 0x5b, 0xf3, 0xd3, 0x43, 0x88, 0x21, 0x23,
+	0x13, 0x22, 0x63, 0x93, 0x07, 0x95, 0x4f, 0xd5, 0x97, 0x02, 0x22, 0xc4, 0x5b, 0x7c, 0xdf, 0xe6,
+	0x62, 0x40, 0xf8, 0xab, 0x00, 0x4b, 0x1c, 0x45, 0xd3, 0xbc, 0x7d, 0xb3, 0x45, 0x16, 0xad, 0x40,
+	0xc1, 0x1c, 0x61, 0xfb, 0x83, 0xad, 0xb9, 0x98, 0x44, 0x20, 0x2f, 0x87, 0x1d, 0x3c, 0x94, 0x32,
+	0x93, 0x40, 0x89, 0xdc, 0xf6, 0x74, 0x73, 0x84, 0xc9, 0xc1, 0x87, 0xdc, 0xf6, 0xbc, 0x96, 0xd8,
+	0x82, 0x6a, 0x92, 0x23, 0x37, 0x20, 0xfa, 0x11, 0x2c, 0xc8, 0xe6, 0x60, 0x70, 0xa2, 0x76, 0x4f,
+	0xaf, 0xc3, 0xf4, 0xd7, 0x3d, 0xec, 0x8b, 0x7b, 0x70, 0x7b, 0x6c, 0xdd, 0x1b, 0x38, 0xf1, 0x53,
+	0xaf, 0x58, 0x0d, 0xf0, 0xf5, 0x0e, 0x24, 0x97, 0xb8, 0x70, 0xc9, 0xae, 0xf6, 0xca, 0x7f, 0x64,
+	0xed, 0x1b, 0xb8, 0xa1, 0xc0, 0x9d, 0xe0, 0xa0, 0xf6, 0x29, 0x40, 0x2a, 0xbe, 0xe6, 0xce, 0x9a,
+	0xe3, 0xe0, 0xb9, 0xe2, 0xb3, 0x9a, 0xf8, 0x02, 0x4a, 0x6d, 0xec, 0xba, 0x9a, 0xd1, 0x77, 0x5a,
+	0xaa, 0xad, 0xea, 0x97, 0x3f, 0x65, 0xfb, 0xf4, 0x23, 0xee, 0xc2, 0xe2, 0xd6, 0x40, 0x23, 0x73,
+	0xd2, 0x09, 0x38, 0x23, 0x72, 0x96, 0x37, 0x99, 0x6f, 0xc3, 0x62, 0x60, 0x43, 0x64, 0x2d, 0x99,
+	0x69, 0x89, 0x77, 0xe0, 0xf6, 0xf8, 0x4c, 0xf4, 0xf1, 0xf0, 0x9f, 0x29, 0x28, 0xb6, 0x6c, 0x6d,
+	0xa4, 0xba, 0x78, 0x5f, 0x33, 0x4e, 0xd1, 0x73, 0x98, 0xb5, 0x68, 0x53, 0x19, 0x68, 0xc6, 0x69,
+	0x18, 0xc6, 0xf2, 0xc7, 0x56, 0xc9, 0x0a, 0x15, 0x1b, 0xdb, 0x72, 0xa4, 0xd9, 0x0b, 0xdc, 0x4a,
+	0x71, 0x6e, 0x85, 0x8f, 0x31, 0x99, 0xc8, 0x63, 0x0c, 0x82, 0x8c, 0x65, 0xda, 0xf4, 0x7d, 0xaa,
+	0x24, 0x93, 0xdf, 0xde, 0x95, 0x02, 0x1b, 0x3d, 0xcb, 0xd4, 0x02, 0x6a, 0x0a, 0xda, 0xe8, 0x09,
+	0xcc, 0x77, 0x4d, 0xc3, 0xc0, 0x5d, 0x57, 0x33, 0x0d, 0x25, 0x50, 0xa3, 0xa5, 0x0c, 0x85, 0x22,
+	0xc9, 0x1f, 0xb0, 0x0e, 0x33, 0xf4, 0xfb, 0x08, 0x5b, 0x9e, 0x3e, 0x9c, 0x14, 0x49, 0x1f, 0x7b,
+	0xac, 0xf8, 0x0e, 0xa4, 0xd5, 0x0f, 0x0e, 0xbb, 0xa8, 0xdd, 0xe5, 0x68, 0x34, 0x70, 0xaa, 0x56,
+	0x7f, 0xd3, 0xde, 0x32, 0x8d, 0x77, 0x5a, 0xdf, 0xab, 0xdd, 0xbb, 0x53, 0xb2, 0x37, 0xa0, 0xfa,
+	0x18, 0x0a, 0x41, 0xbf, 0x77, 0xda, 0x0a, 0xac, 0x09, 0x5f, 0xe3, 0x83, 0xbe, 0xcd, 0x3c, 0xe4,
+	0xba, 0x44, 0x53, 0xfc, 0x79, 0x1a, 0xe6, 0xb8, 0xb9, 0xdb, 0xf4, 0x76, 0xf5, 0x22, 0xb8, 0x75,
+	0xd1, 0xaf, 0x2c, 0xeb, 0x49, 0x76, 0x50, 0xdd, 0x1a, 0xfd, 0x2f, 0xb8, 0x98, 0x45, 0x3f, 0x56,
+	0xa4, 0xae, 0xf2, 0xb1, 0x82, 0xa4, 0x45, 0x75, 0x02, 0xb2, 0x61, 0x2d, 0xf1, 0x6f, 0x02, 0xe4,
+	0x98, 0x61, 0xf7, 0x60, 0xb9, 0x25, 0x37, 0x8e, 0xeb, 0x1d, 0x49, 0xd9, 0x6f, 0x34, 0xf7, 0x94,
+	0x76, 0xa7, 0xde, 0x39, 0x6a, 0x2b, 0x47, 0xcd, 0xbd, 0xe6, 0xe1, 0x9b, 0x66, 0x79, 0x0a, 0x3d,
+	0x80, 0xb5, 0x24, 0x85, 0x96, 0x7c, 0x78, 0xdc, 0x68, 0x37, 0x0e, 0x9b, 0x8d, 0xe6, 0x4e, 0x59,
+	0x40, 0x1b, 0xf0, 0x20, 0x51, 0x4b, 0x6a, 0x6e, 0x37, 0x9a, 0x3b, 0x4a, 0xbd, 0xe5, 0xe9, 0xd7,
+	0xf7, 0xcb, 0xa9, 0xf3, 0x16, 0xdc, 0x95, 0xea, 0xfb, 0x9d, 0xdd, 0xb7, 0xe5, 0x34, 0x5a, 0x87,
+	0xd5, 0x64, 0x8b, 0x7c, 0x95, 0x0c, 0x5a, 0x83, 0x95, 0x24, 0x15, 0xba, 0x8a, 0xb4, 0x5d, 0xce,
+	0x8a, 0x7f, 0x4e, 0x41, 0x85, 0x3e, 0x65, 0x73, 0xf1, 0xf5, 0xb9, 0x23, 0x69, 0x63, 0x86, 0x08,
+	0x4e, 0x27, 0x22, 0x38, 0x73, 0x0e, 0x82, 0xb3, 0x63, 0x08, 0xfe, 0xbf, 0x31, 0x40, 0x12, 0x84,
+	0xef, 0x0a, 0x11, 0x48, 0xfe, 0x52, 0x10, 0x50, 0x83, 0xa2, 0x92, 0xa6, 0xf3, 0x69, 0x80, 0x86,
+	0xf3, 0x6c, 0x26, 0x10, 0x25, 0xb2, 0x38, 0x50, 0x9f, 0xc2, 0xec, 0x98, 0x74, 0x72, 0xb8, 0x6e,
+	0xce, 0x42, 0x49, 0xe1, 0x0d, 0x16, 0x3b, 0xb0, 0x94, 0x60, 0x04, 0xa3, 0xa3, 0xef, 0xc2, 0x0c,
+	0xcf, 0x1a, 0x64, 0x6e, 0x9e, 0x18, 0xf9, 0x31, 0x45, 0x8e, 0x36, 0xc4, 0x23, 0x58, 0xda, 0xc6,
+	0x8e, 0x6b, 0x9b, 0x67, 0x09, 0xf9, 0xb8, 0x36, 0x17, 0x89, 0x2b, 0x50, 0x4d, 0x9a, 0x96, 0x5a,
+	0x2b, 0x2e, 0xd1, 0xf2, 0xc1, 0x89, 0x02, 0x3a, 0x7c, 0x45, 0x89, 0x3f, 0x2a, 0x0a, 0x5e, 0x94,
+	0xb2, 0x9a, 0x8b, 0xf5, 0x38, 0xed, 0xf3, 0x6b, 0x50, 0x15, 0xf1, 0x0d, 0x2c, 0xef, 0x60, 0x37,
+	0xb6, 0x87, 0x6f, 0xee, 0x59, 0x0b, 0x56, 0x92, 0x27, 0x66, 0x46, 0x7e, 0xe1, 0x17, 0x12, 0x81,
+	0x11, 0xc2, 0xb9, 0x7c, 0xc2, 0x8a, 0xcc, 0x23, 0x93, 0xbd, 0xa1, 0x87, 0x1f, 0x29, 0xd1, 0x2a,
+	0x2c, 0xd5, 0x77, 0xa4, 0x66, 0x47, 0x69, 0x4b, 0x5b, 0xb2, 0xd4, 0x51, 0xf6, 0x1a, 0xcd, 0x6d,
+	0x6e, 0xeb, 0xaf, 0xc3, 0x6a, 0x5c, 0x2c, 0x35, 0x8f, 0x1b, 0xf2, 0x61, 0xf3, 0x40, 0x6a, 0x76,
+	0xca, 0x02, 0xaa, 0xc2, 0x62, 0x5c, 0xe5, 0x55, 0x63, 0x5f, 0x2a, 0xa7, 0x1e, 0x7d, 0x14, 0xe0,
+	0x56, 0xf4, 0x1b, 0x32, 0x5a, 0x81, 0x0a, 0x55, 0x97, 0x8e, 0xbd, 0x7f, 0x3b, 0x6f, 0x5b, 0x12,
+	0xb7, 0xde, 0x06, 0x3c, 0x88, 0x49, 0xeb, 0xad, 0xd6, 0x7e, 0x63, 0xab, 0xde, 0x69, 0x1c, 0x36,
+	0x95, 0x2d, 0xb9, 0xde, 0xde, 0x95, 0xb6, 0xcb, 0x02, 0xaa, 0xc1, 0xa3, 0x98, 0xa6, 0x2c, 0xb5,
+	0x3b, 0x75, 0xb9, 0x23, 0x6d, 0x2b, 0xbb, 0x8d, 0x9d, 0x5d, 0x65, 0xbb, 0xd1, 0xde, 0x53, 0x8e,
+	0xda, 0xf5, 0x1d, 0xa9, 0x9c, 0x42, 0x5f, 0xc0, 0x67, 0x97, 0xe9, 0x1f, 0x48, 0x07, 0x87, 0xf2,
+	0x5b, 0x36, 0x22, 0xfd, 0xec, 0xeb, 0x19, 0x80, 0x2d, 0x6f, 0x5f, 0x10, 0x0f, 0xd0, 0x6b, 0x28,
+	0x72, 0x5f, 0xc6, 0xd0, 0xf2, 0xd8, 0x86, 0xe5, 0x8f, 0x59, 0xd5, 0x95, 0x64, 0x21, 0x03, 0xe5,
+	0x14, 0x6a, 0x41, 0x29, 0xf2, 0x95, 0x0d, 0xad, 0x26, 0x0d, 0x08, 0xee, 0x3c, 0xd5, 0xbb, 0xe7,
+	0x89, 0x83, 0x19, 0x0f, 0x60, 0x86, 0xff, 0x54, 0x85, 0x56, 0x38, 0x34, 0xc4, 0x3e, 0xa7, 0x55,
+	0x57, 0xcf, 0x91, 0x06, 0xd3, 0xed, 0x00, 0x84, 0x0f, 0xad, 0x28, 0x84, 0x56, 0xec, 0x61, 0xb7,
+	0xba, 0x9c, 0x28, 0x0b, 0x26, 0xfa, 0x31, 0xf7, 0x18, 0xec, 0x3f, 0xb4, 0xa1, 0xf5, 0xf8, 0x98,
+	0xb1, 0x67, 0xbe, 0xaa, 0x78, 0x91, 0x4a, 0x30, 0xfb, 0x5b, 0x28, 0x8f, 0x1f, 0xde, 0xd0, 0x5a,
+	0x7c, 0x64, 0xf4, 0xe0, 0x58, 0x5d, 0xbf, 0x40, 0x23, 0x98, 0xfa, 0x35, 0x14, 0xb9, 0x6b, 0x05,
+	0x97, 0xee, 0xf8, 0x33, 0x1f, 0x97, 0xee, 0x84, 0x57, 0x2f, 0x9a, 0x1c, 0xfe, 0x15, 0x8a, 0x4b,
+	0x4e, 0xc2, 0xd3, 0x16, 0x97, 0x9c, 0xa4, 0xa7, 0x2b, 0x6a, 0x1a, 0x77, 0x4b, 0xe5, 0x4c, 0x8b,
+	0x3f, 0xb7, 0x70, 0xa6, 0x25, 0xbc, 0x8c, 0x50, 0x24, 0x46, 0x6e, 0xbc, 0x1c, 0x12, 0x93, 0x6e,
+	0xdf, 0x1c, 0x12, 0x13, 0x2f, 0xca, 0xe2, 0x14, 0x52, 0x22, 0x2f, 0xa1, 0x7e, 0x56, 0xc4, 0xa4,
+	0x10, 0x8d, 0xe5, 0xe5, 0xfe, 0x85, 0x3a, 0xbc, 0xc9, 0x91, 0x6b, 0x12, 0x67, 0x72, 0xd2, 0xb5,
+	0x8d, 0x33, 0x39, 0xf1, 0x76, 0xe5, 0x07, 0x34, 0xb8, 0xaf, 0x44, 0x02, 0x3a, 0x7e, 0x83, 0x8a,
+	0x04, 0x34, 0x76, 0xc5, 0x11, 0xa7, 0xd0, 0x31, 0xcc, 0xed, 0x60, 0x37, 0x7a, 0x02, 0x47, 0xdc,
+	0xfe, 0x4d, 0x3a, 0x9a, 0x57, 0xef, 0x9d, 0x2b, 0xe7, 0x37, 0x52, 0xac, 0x28, 0x73, 0x1b, 0xe9,
+	0xbc, 0x53, 0x03, 0xb7, 0x91, 0xce, 0xad, 0xe9, 0x34, 0x69, 0xf1, 0x2a, 0xca, 0x25, 0xed, 0xdc,
+	0xca, 0xcd, 0x25, 0xed, 0x82, 0x32, 0x1c, 0xec, 0x54, 0xbe, 0xda, 0x8e, 0xed, 0xd4, 0x84, 0x1a,
+	0x3d, 0xb6, 0x53, 0x93, 0x4a, 0xb5, 0x38, 0x85, 0x30, 0x2c, 0x24, 0xd5, 0x49, 0xf4, 0x20, 0x18,
+	0x7c, 0x41, 0x7d, 0xae, 0x3e, 0xbc, 0x44, 0xcb, 0x5f, 0x66, 0xf3, 0xd5, 0x8f, 0xee, 0xf7, 0x35,
+	0xf7, 0x27, 0xc3, 0x93, 0x5a, 0xd7, 0xd4, 0x9f, 0xb0, 0x41, 0xf4, 0xef, 0xae, 0xba, 0xe6, 0xc0,
+	0xef, 0xf8, 0x53, 0xaa, 0xb4, 0xaf, 0x8d, 0xf0, 0x1e, 0xa5, 0x56, 0xd7, 0xfc, 0x77, 0xea, 0x16,
+	0x6b, 0xbf, 0x7c, 0x49, 0x3a, 0x4e, 0x72, 0x64, 0xc8, 0xb7, 0xff, 0x1b, 0x00, 0x00, 0xff, 0xff,
+	0xea, 0x70, 0xc2, 0x36, 0xde, 0x25, 0x00, 0x00,
 }

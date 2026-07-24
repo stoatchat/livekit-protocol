@@ -21,10 +21,9 @@ import (
 	"io"
 	"net/http"
 
-	"google.golang.org/protobuf/encoding/protojson"
-
 	"github.com/livekit/protocol/auth"
 	"github.com/livekit/protocol/livekit"
+	"github.com/livekit/protocol/utils/protojson"
 )
 
 // Receive reads and verifies incoming webhook is signed with key/secret pair
@@ -51,7 +50,7 @@ func Receive(r *http.Request, provider auth.KeyProvider) ([]byte, error) {
 		return nil, ErrSecretNotFound
 	}
 
-	claims, err := v.Verify(secret)
+	_, claims, err := v.Verify(secret)
 	if err != nil {
 		return nil, err
 	}

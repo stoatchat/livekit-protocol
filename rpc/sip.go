@@ -1,13 +1,15 @@
 package rpc
 
 import (
-	"errors"
 	"maps"
 	"math/rand/v2"
 	"net"
 	"strings"
 
+	"google.golang.org/protobuf/proto"
+
 	"github.com/livekit/protocol/livekit"
+	"github.com/livekit/psrpc"
 )
 
 func (p *GetSIPTrunkAuthenticationRequest) SIPCall() *SIPCall {
@@ -67,16 +69,30 @@ func (p *EvaluateSIPDispatchRulesRequest) SIPCall() *SIPCall {
 // NewCreateSIPParticipantRequest fills InternalCreateSIPParticipantRequest from
 // livekit.CreateSIPParticipantRequest and livekit.SIPTrunkInfo.
 func NewCreateSIPParticipantRequest(
-	projectID, callID, ownHostname, wsUrl, token string,
+	projectID, callID, fromHostname, wsUrl, token string,
 	req *livekit.CreateSIPParticipantRequest,
 	trunk *livekit.SIPOutboundTrunkInfo,
 ) (*InternalCreateSIPParticipantRequest, error) {
-	if err := req.Validate(); err != nil {
-		return nil, err
+	val, result := NewCreateSIPParticipantRequestResult(projectID, callID, fromHostname, wsUrl, token, req, trunk)
+	if !result.OK() {
+		return nil, result.Error()
+	}
+	return val, nil
+}
+
+// NewCreateSIPParticipantRequestResult is a variant of the above that returns a livekit.ValidationResult.
+func NewCreateSIPParticipantRequestResult(
+	projectID, callID, fromHostname, wsUrl, token string,
+	req *livekit.CreateSIPParticipantRequest,
+	trunk *livekit.SIPOutboundTrunkInfo,
+) (*InternalCreateSIPParticipantRequest, livekit.ValidationResult) {
+	req.Upgrade()
+	result := req.ValidateResult()
+	if !result.OK() {
+		return nil, result
 	}
 	var (
 		hostname           string
-		enc                livekit.SIPMediaEncryption
 		headers            map[string]string
 		includeHeaders     livekit.SIPHeaderOptions
 		transport          livekit.SIPTransport
@@ -85,10 +101,11 @@ func NewCreateSIPParticipantRequest(
 		authPass           string
 		hdrToAttr          map[string]string
 		attrToHdr          map[string]string
+		mediaConf          *livekit.SIPMediaConfig
 	)
 	if trunk != nil {
+		trunk.Upgrade()
 		hostname = trunk.Address
-		enc = trunk.MediaEncryption
 		headers = trunk.Headers
 		includeHeaders = trunk.IncludeHeaders
 		transport = trunk.Transport
@@ -97,6 +114,9 @@ func NewCreateSIPParticipantRequest(
 		authPass = trunk.AuthPassword
 		hdrToAttr = trunk.HeadersToAttributes
 		attrToHdr = trunk.AttributesToHeaders
+
+		media := proto.CloneOf(trunk.Media)
+		mediaConf = mediaConf.Merge(media)
 	} else if t := req.Trunk; t != nil {
 		hostname = t.Hostname
 		transport = t.Transport
@@ -110,7 +130,7 @@ func NewCreateSIPParticipantRequest(
 	outboundNumber := req.SipNumber
 	if outboundNumber == "" {
 		if trunk == nil || len(trunk.Numbers) == 0 {
-			return nil, errors.New("no numbers on outbound trunk")
+			return nil, result.WithError(psrpc.NewErrorf(psrpc.FailedPrecondition, "no numbers on outbound trunk"))
 		}
 		outboundNumber = trunk.Numbers[rand.IntN(len(trunk.Numbers))]
 	}
@@ -142,9 +162,6 @@ func NewCreateSIPParticipantRequest(
 	if req.KrispEnabled {
 		features = append(features, livekit.SIPFeature_KRISP_ENABLED)
 	}
-	if req.MediaEncryption != 0 {
-		enc = req.MediaEncryption
-	}
 
 	if len(req.Headers) != 0 {
 		headers = maps.Clone(headers)
@@ -162,14 +179,20 @@ func NewCreateSIPParticipantRequest(
 	if participantIdentity == "" {
 		participantIdentity = "sip_" + req.SipCallTo
 	}
-
+	{
+		media := proto.CloneOf(req.Media)
+		mediaConf = mediaConf.Merge(media)
+	}
 	return &InternalCreateSIPParticipantRequest{
 		ProjectId:             projectID,
 		SipCallId:             callID,
 		SipTrunkId:            trunkID,
 		DestinationCountry:    destinationCountry,
+		SipRequestUri:         req.SipRequestUri,
+		SipFromHeader:         req.SipFromHeader,
+		SipToHeader:           req.SipToHeader,
 		Address:               hostname,
-		Hostname:              ownHostname,
+		Hostname:              fromHostname,
 		Transport:             transport,
 		Number:                outboundNumber,
 		Username:              authUser,
@@ -191,10 +214,12 @@ func NewCreateSIPParticipantRequest(
 		EnabledFeatures:       features,
 		RingingTimeout:        req.RingingTimeout,
 		MaxCallDuration:       req.MaxCallDuration,
-		MediaEncryption:       enc,
+		MediaEncryption:       mediaConf.Encryption.Deref(),
+		Media:                 mediaConf,
 		WaitUntilAnswered:     req.WaitUntilAnswered,
 		DisplayName:           req.DisplayName,
-	}, nil
+		Destination:           req.Destination,
+	}, result
 }
 
 // NewTransferSIPParticipantRequest fills InternalTransferSIPParticipantRequest from
@@ -210,4 +235,12 @@ func NewTransferSIPParticipantRequest(
 		Headers:        req.Headers,
 		RingingTimeout: req.RingingTimeout,
 	}, nil
+}
+
+func (p *InternalCreateSIPParticipantRequest) Upgrade() {
+	p.Media = p.Media.UpgradeWith(p.MediaEncryption)
+}
+
+func (p *EvaluateSIPDispatchRulesResponse) Upgrade() {
+	p.Media = p.Media.UpgradeWith(p.MediaEncryption)
 }
